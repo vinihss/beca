@@ -10,25 +10,6 @@ use std::time::Duration;
 
 use beca_ui::ui_loader;
 
-fn voice_theme_from_resolved(t: &beca_core::tema::Theme) -> beca_ui::voice::VoiceTheme {
-    beca_ui::voice::VoiceTheme {
-        background: t.colors.background.clone(),
-        text_main: t.colors.text_main.clone(),
-        card_bg: t.colors.card_bg.clone(),
-        card_border: t.colors.card_border.clone(),
-        surface: t.colors.surface.clone(),
-        surface_alt: t.colors.surface_alt.clone(),
-        border: t.colors.border.clone(),
-        text_strong: t.colors.text_strong.clone(),
-        accent: t.colors.accent.clone(),
-        accent_success: t.colors.accent_success.clone(),
-        accent_danger: t.colors.accent_danger.clone(),
-        recording: t.colors.recording.clone(),
-        radius: t.metrics.radius,
-        dark_mode: t.meta.variant != "light",
-    }
-}
-
 fn format_clock(format: &str) -> String {
     // Use `date` for local-time strftime formatting (no extra deps).
     let out = Command::new("date").arg(format!("+{}", format)).output();
@@ -472,7 +453,7 @@ fn dock_bar_hyprland(position: &str, height: f32, exclusive: bool) -> Option<Str
 pub fn show(position: &str) -> Result<()> {
     let resolved = beca_core::config::load();
     let bar_cfg = &resolved.config.modules.bar;
-    let theme = voice_theme_from_resolved(&resolved.theme);
+    let theme = resolved.theme.voice_theme();
 
     let app = ui_loader::create("BarWindow").map_err(|e| anyhow::anyhow!(e))?;
     ui_loader::apply_theme_global(&app, &theme);
@@ -491,6 +472,8 @@ pub fn show(position: &str) -> Result<()> {
         "voice-label",
         Value::String(bar_cfg.voice_label.clone().into()),
     );
+    let _ = app.set_property("show-voice-assistant", Value::Bool(true));
+    let _ = app.set_property("voice-assistant-label", Value::String("VA".into()));
     // layout: 3 sections (left/center/right) with per-section alignment and widget placement
     let _ = app.set_property(
         "clock-section",
@@ -510,6 +493,10 @@ pub fn show(position: &str) -> Result<()> {
     );
     let _ = app.set_property(
         "voice-section",
+        Value::String(bar_cfg.voice_section.clone().into()),
+    );
+    let _ = app.set_property(
+        "voice-assistant-section",
         Value::String(bar_cfg.voice_section.clone().into()),
     );
     let _ = app.set_property(
@@ -565,7 +552,7 @@ pub fn show(position: &str) -> Result<()> {
                 if let Ok(clients) = serde_json::from_slice::<Vec<serde_json::Value>>(&out.stdout) {
                     if let Some(addr) = clients.iter().find_map(|c| {
                         let title = c.get("title").and_then(|v| v.as_str()).unwrap_or("");
-                        if title == "Voice Capture" {
+                        if title == "Voice Capture" || title == "Voice Assistant" {
                             c.get("address").and_then(|v| v.as_str()).map(|s| s.to_string())
                         } else {
                             None
@@ -579,14 +566,34 @@ pub fn show(position: &str) -> Result<()> {
                 }
             }
         }
-        let exe = std::env::current_exe()
-            .ok()
-            .and_then(|p| p.to_str().map(|s| s.to_string()))
-            .unwrap_or_else(|| "beca".to_string());
-        // Route via daemon to resident voice when available (fast path).
-        let _ = Command::new(exe)
-            .args(["mod", "voice:show"])
-            .spawn();
+        // Ask daemon/resident directly (avoids spawning an extra CLI process).
+        let req = serde_json::json!({"type":"mod","target":"voice:show","args":[]});
+        let _ = crate::daemon::send_request(&req);
+        Value::Void
+    });
+
+    let _ = app.set_callback("voice-assistant-clicked", |_args| {
+        if let Ok(out) = Command::new("hyprctl").args(["clients", "-j"]).output() {
+            if out.status.success() {
+                if let Ok(clients) = serde_json::from_slice::<Vec<serde_json::Value>>(&out.stdout) {
+                    if let Some(addr) = clients.iter().find_map(|c| {
+                        let title = c.get("title").and_then(|v| v.as_str()).unwrap_or("");
+                        if title == "Voice Assistant" {
+                            c.get("address").and_then(|v| v.as_str()).map(|s| s.to_string())
+                        } else {
+                            None
+                        }
+                    }) {
+                        let _ = Command::new("hyprctl")
+                            .args(["dispatch", "focuswindow", &format!("address:{addr}")])
+                            .spawn();
+                        return Value::Void;
+                    }
+                }
+            }
+        }
+        let req = serde_json::json!({"type":"mod","target":"voice:assistant","args":[]});
+        let _ = crate::daemon::send_request(&req);
         Value::Void
     });
 

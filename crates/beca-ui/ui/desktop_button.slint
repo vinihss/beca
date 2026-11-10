@@ -9,7 +9,6 @@ export component DesktopButton inherits Rectangle {
     height: 38px;
     min-width: 96px;
     border-radius: Theme.radius;
-    animate background { duration: 150ms; }
     opacity: root.enabled ? 1.0 : 0.45;
     background: !root.enabled ? #007ACC
         : touch-area.pressed ? #005999

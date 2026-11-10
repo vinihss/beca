@@ -5,25 +5,6 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-fn theme_from_config(theme: &beca_core::tema::Theme) -> beca_ui::voice::VoiceTheme {
-    beca_ui::voice::VoiceTheme {
-        background: theme.colors.background.clone(),
-        text_main: theme.colors.text_main.clone(),
-        card_bg: theme.colors.card_bg.clone(),
-        card_border: theme.colors.card_border.clone(),
-        surface: theme.colors.surface.clone(),
-        surface_alt: theme.colors.surface_alt.clone(),
-        border: theme.colors.border.clone(),
-        text_strong: theme.colors.text_strong.clone(),
-        accent: theme.colors.accent.clone(),
-        accent_success: theme.colors.accent_success.clone(),
-        accent_danger: theme.colors.accent_danger.clone(),
-        recording: theme.colors.recording.clone(),
-        radius: theme.metrics.radius,
-        dark_mode: theme.meta.variant != "light",
-    }
-}
-
 fn ui_texts_from_config(ui: &beca_core::config::VoiceUiConfig) -> beca_ui::voice::VoiceUiTexts {
     let opt = |s: &str| -> Option<String> {
         if s.trim().is_empty() {
@@ -56,7 +37,7 @@ fn run_voice_session(args: &[String]) -> Result<()> {
     let resolved = beca_core::config::load();
     eprintln!("[beca-voice][timing] config+theme loaded in {:?}", t0.elapsed());
     let voice = &resolved.config.modules.voice;
-    let theme = theme_from_config(&resolved.theme);
+    let theme = resolved.theme.voice_theme();
     let ui_texts = ui_texts_from_config(&voice.ui);
     let respond_cfg = beca_ui::voice::RespondConfig {
         respond_command: voice.respond_command.clone(),
@@ -112,7 +93,7 @@ fn run_voice_session(args: &[String]) -> Result<()> {
 }
 
 /// Resident voice service: listens for `show` on ctl socket and runs capture sessions.
-/// Keeps process warm (thread-local Slint compile cache reused across sessions).
+/// Keeps process warm and reuses compiled UI definitions across sessions.
 pub fn serve() -> Result<()> {
     let path = voice_ctl_path();
     if let Some(parent) = path.parent() {
@@ -123,16 +104,23 @@ pub fn serve() -> Result<()> {
         .map_err(|e| anyhow::anyhow!("failed to bind voice ctl socket {}: {e}", path.display()))?;
     eprintln!("[beca voice] serving on {}", path.display());
 
-    // Pre-warm: compile UI definition once so first show is faster.
+    // Local cache of compiled UI defs (avoids recompilation across sessions).
+    let mut ui_defs: std::collections::HashMap<String, slint_interpreter::ComponentDefinition> =
+        std::collections::HashMap::new();
+
+    // Pre-warm default voice UI.
     let t_warm = std::time::Instant::now();
     match beca_ui::ui_loader::compile_component("VoiceCaptureWindow") {
-        Ok(_) => eprintln!("[beca voice][timing] ui prewarm in {:?}", t_warm.elapsed()),
+        Ok(def) => {
+            ui_defs.insert("VoiceCaptureWindow".to_string(), def.clone());
+            beca_ui::ui_loader::set_preloaded_component("VoiceCaptureWindow", def);
+            eprintln!("[beca voice][timing] ui prewarm in {:?}", t_warm.elapsed());
+        }
         Err(e) => eprintln!("[beca voice] ui prewarm failed: {e}"),
     }
 
     let running = Arc::new(AtomicBool::new(true));
     while running.load(Ordering::Relaxed) {
-        // accept blocks; set nonblocking-ish via timeout by using try on stream? UnixListener is blocking.
         match listener.accept() {
             Ok((stream, _)) => {
                 let _ = stream.set_read_timeout(Some(std::time::Duration::from_millis(500)));
@@ -146,34 +134,54 @@ pub fn serve() -> Result<()> {
                     continue;
                 }
                 let cmd = line.trim().to_string();
-                match cmd.as_str() {
-                    "show" | "" => {
-                        let _ = writeln!(writer, "ok");
-                        let _ = writer.flush();
-                        // Run capture session (blocks until window closes/session ends).
-                        if let Err(e) = run_voice_session(&[]) {
-                            eprintln!("[beca voice] session error: {e}");
-                        }
-                    }
+                let (component, resp): (&str, &str) = match cmd.as_str() {
+                    "show" | "" => ("VoiceCaptureWindow", "ok"),
+                    "show-assistant" | "assistant" => ("VoiceAssistantWindow", "ok"),
                     "quit" | "stop" => {
                         let _ = writeln!(writer, "ok");
                         let _ = writer.flush();
                         break;
                     }
                     "hide" => {
-                        // no active session to hide in this model; acknowledge
                         let _ = writeln!(writer, "ok");
                         let _ = writer.flush();
+                        continue;
                     }
                     "ping" => {
                         let _ = writeln!(writer, "ok");
                         let _ = writer.flush();
+                        continue;
                     }
-                    other => {
-                        let _ = writeln!(writer, "unknown: {other}");
+                    _ => {
+                        let _ = writeln!(writer, "unknown: {cmd}");
                         let _ = writer.flush();
+                        continue;
+                    }
+                };
+
+                let _ = writeln!(writer, "{resp}");
+                let _ = writer.flush();
+
+                // Ensure compiled def is available and pinned for this session.
+                if !ui_defs.contains_key(component) {
+                    match beca_ui::ui_loader::compile_component(component) {
+                        Ok(def) => { ui_defs.insert(component.to_string(), def); }
+                        Err(e) => {
+                            eprintln!("[beca voice] compile {component} failed: {e}");
+                        }
                     }
                 }
+                if let Some(def) = ui_defs.get(component).cloned() {
+                    beca_ui::ui_loader::set_preloaded_component(component, def);
+                    eprintln!("[beca voice] preloaded set for {component}");
+                } else {
+                    eprintln!("[beca voice] no preloaded def available for {component}");
+                }
+                unsafe { std::env::set_var("BECA_VOICE_COMPONENT", component) };
+                if let Err(e) = run_voice_session(&[]) {
+                    eprintln!("[beca voice] session error: {e}");
+                }
+                unsafe { std::env::remove_var("BECA_VOICE_COMPONENT") };
             }
             Err(e) => {
                 eprintln!("[beca voice] accept error: {e}");
@@ -181,6 +189,7 @@ pub fn serve() -> Result<()> {
             }
         }
     }
+    beca_ui::ui_loader::clear_preloaded_component();
     let _ = std::fs::remove_file(&path);
     Ok(())
 }
@@ -190,10 +199,17 @@ pub fn dispatch(action: &str, args: &[String]) -> Result<()> {
     match action {
         "serve" => serve(),
         "show" => run_voice_session(args),
+        "assistant" | "show-assistant" => {
+            // Safety: best-effort, single-use in CLI dispatch path.
+            unsafe { std::env::set_var("BECA_VOICE_COMPONENT", "VoiceAssistantWindow") };
+            let r = run_voice_session(args);
+            unsafe { std::env::remove_var("BECA_VOICE_COMPONENT") };
+            r
+        }
         "transcribe" => {
             let resolved = beca_core::config::load();
             let voice = &resolved.config.modules.voice;
-            let theme = theme_from_config(&resolved.theme);
+            let theme = resolved.theme.voice_theme();
             let ui_texts = ui_texts_from_config(&voice.ui);
             let respond_cfg = beca_ui::voice::RespondConfig {
                 respond_command: voice.respond_command.clone(),

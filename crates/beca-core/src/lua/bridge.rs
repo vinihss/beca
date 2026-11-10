@@ -298,29 +298,9 @@ fn notify_msg(msg: &str) {
         .status();
 }
 
-fn voice_theme_from_resolved(t: &crate::tema::Theme) -> beca_ui::voice::VoiceTheme {
-    beca_ui::voice::VoiceTheme {
-        background: t.colors.background.clone(),
-        text_main: t.colors.text_main.clone(),
-        card_bg: t.colors.card_bg.clone(),
-        card_border: t.colors.card_border.clone(),
-        surface: t.colors.surface.clone(),
-        surface_alt: t.colors.surface_alt.clone(),
-        border: t.colors.border.clone(),
-        text_strong: t.colors.text_strong.clone(),
-        accent: t.colors.accent.clone(),
-        accent_success: t.colors.accent_success.clone(),
-        accent_danger: t.colors.accent_danger.clone(),
-        recording: t.colors.recording.clone(),
-        radius: t.metrics.radius,
-        dark_mode: t.meta.variant != "light",
-    }
-}
-
 fn apply_theme_voice(app: &ComponentInstance) {
     let resolved = crate::config::load();
-    let t = voice_theme_from_resolved(&resolved.theme);
-    beca_ui::ui_loader::apply_theme_global(app, &t);
+    beca_ui::ui_loader::apply_theme_global(app, &resolved.theme.voice_theme());
 }
 
 enum AppHandle {

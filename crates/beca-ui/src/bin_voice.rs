@@ -16,6 +16,9 @@ struct CliArgs {
     /// Keep UI open and show transcript after success (breaks q-voice pipe/exit contract)
     #[arg(long)]
     hold: bool,
+    /// After transcription, generate an LLM response and speak it via TTS
+    #[arg(long)]
+    respond: bool,
 }
 
 fn main() {
@@ -25,6 +28,7 @@ fn main() {
         input: cli.input,
         run: cli.run,
         hold: cli.hold,
+        respond: cli.respond,
     };
     if let Err(e) = beca_ui::voice::run(args) {
         eprintln!("ERROR: {e}");

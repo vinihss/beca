@@ -1,0 +1,156 @@
+import { HorizontalBox, VerticalBox, ScrollView } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { InfoCard } from "info_card.slint";
+import { MediaButton } from "media_button.slint";
+import { WaveformView } from "waveform_view.slint";
+import { StatusHeader, SettingsPanel, CaptureControls, ResultActions } from "voice_common.slint";
+
+export component VoiceAssistantWindow inherits Window {
+    title: "Voice Assistant";
+    width: 540px;
+    min-height: 300px;
+    background: transparent;
+    default-font-family: "Sans";
+
+    // ---- State (driven by Rust / behavior scripts) ----
+    in property <string> audio-path-data: "M 0 80 L 508 80";
+    in property <string> status-text: "Pronto para gravar";
+    in property <brush> status-color: Theme.accent;
+    in property <bool> busy: false;
+    in property <bool> is-recording: false;
+    in property <bool> show-result: false;
+    in property <string> transcript-text: "";
+    in property <string> response-text: "";
+    in-out property <bool> show-settings: false;
+    in-out property <bool> respond-enabled: true;
+    in-out property <bool> hold-enabled: false;
+    // Accordion opening animation (used by the capture window).
+    in-out property <bool> reveal: false;
+    in property <bool> reveal-enabled: false;
+
+    // ---- Callbacks (handled by Rust) ----
+    callback send();
+    callback cancel();
+    callback copy-text();
+    callback close-app();
+    callback settings-toggled(bool);
+    callback respond-toggled(bool);
+    callback hold-toggled(bool);
+    callback new-recording();
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: Theme.background;
+        border-radius: 16px;
+        clip: true;
+
+        // Reveal container: animates height when `reveal-enabled` is true.
+        Rectangle {
+            x: 0;
+            y: 0;
+            width: 100%;
+            height: (!root.reveal-enabled || root.reveal) ? parent.height : 0px;
+            clip: true;
+
+            VerticalBox {
+                x: 0;
+                y: 0;
+                width: 100%;
+                padding: 16px;
+                spacing: 14px;
+
+                StatusHeader {
+                    status-text: root.status-text;
+                    status-color: root.status-color;
+                    busy: root.busy;
+                    settings-open: root.show-settings;
+                    settings-clicked => {
+                        root.show-settings = !root.show-settings;
+                        root.settings-toggled(root.show-settings);
+                    }
+                }
+
+                if root.show-settings : SettingsPanel {
+                    respond-enabled: root.respond-enabled;
+                    hold-enabled: root.hold-enabled;
+                    interactions-enabled: !root.busy && !root.is-recording;
+                    respond-toggled(enabled) => {
+                        root.respond-enabled = enabled;
+                        root.respond-toggled(enabled);
+                    }
+                    hold-toggled(enabled) => {
+                        root.hold-enabled = enabled;
+                        root.hold-toggled(enabled);
+                    }
+                }
+
+                // ===== Capture screen (not showing a result) =====
+                if !root.show-result : VerticalBox {
+                    spacing: 14px;
+
+                    WaveformView {
+                        border-size: 0px;
+                        audio-path-data: root.audio-path-data;
+                    }
+
+                    if root.response-text != "" : InfoCard {
+                        border-size: 0px;
+                        title: "Resposta";
+                        min-height: 90px;
+                        ScrollView {
+                            width: 100%;
+                            min-height: 60px;
+                            VerticalBox {
+                                Text {
+                                    width: 100%;
+                                    text: root.response-text;
+                                    color: Theme.text-strong;
+                                    font-size: 14px;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+                    }
+
+                    CaptureControls {
+                        busy: root.busy;
+                        is-recording: root.is-recording;
+                        cancel => { root.cancel(); }
+                        send => { root.send(); }
+                    }
+                }
+
+                // ===== Result screen (transcript) =====
+                if root.show-result : VerticalBox {
+                    spacing: 12px;
+
+                    InfoCard {
+                        border-size: 0px;
+                        title: "Transcrição";
+                        min-height: 140px;
+                        ScrollView {
+                            width: 100%;
+                            min-height: 100px;
+                            VerticalBox {
+                                Text {
+                                    width: 100%;
+                                    text: root.transcript-text;
+                                    color: Theme.text-strong;
+                                    font-size: 15px;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+                    }
+
+                    ResultActions {
+                        copy-text => { root.copy-text(); }
+                        new-recording => { root.new-recording(); }
+                        close-app => { root.close-app(); }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,46 @@
+import { Theme } from "theme.slint";
+
+/// Generic pill-shaped bar item (icon + optional label).
+/// Reused by the concrete bar widgets (launcher, voice, ...).
+export component PillButton inherits Rectangle {
+    in property <string> icon;
+    in property <string> label: "";
+    in property <brush> icon-color: Theme.accent;
+    in property <bool> active: false;
+    in property <bool> enabled: true;
+    callback clicked;
+
+    min-width: 56px;
+    min-height: 24px;
+    border-radius: 6px;
+    opacity: root.enabled ? 1.0 : 0.45;
+    background: ((touch.has-hover && root.enabled) || root.active) ? Theme.surface-alt : transparent;
+
+    HorizontalLayout {
+        alignment: center;
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 6px;
+        Text {
+            text: root.icon;
+            color: root.icon-color;
+            font-size: 14px;
+            vertical-alignment: center;
+        }
+        if root.label != "" : Text {
+            text: root.label;
+            color: Theme.text-main;
+            font-size: 13px;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        width: 100%;
+        height: 100%;
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+        mouse-cursor: pointer;
+    }
+}

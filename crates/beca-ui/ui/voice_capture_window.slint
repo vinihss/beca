@@ -3,66 +3,56 @@ import { Theme } from "theme.slint";
 import { InfoCard } from "info_card.slint";
 import { MediaButton } from "media_button.slint";
 import { WaveformView } from "waveform_view.slint";
+import { StatusHeader, SettingsPanel, CaptureControls, ResultActions } from "voice_common.slint";
 
-// Janela principal de captura de voz (gravar, enviar, responder/TTS e exibir resultado).
 export component VoiceCaptureWindow inherits Window {
-    // ---- Janela (Window): tamanho, fundo e fonte base ----
     title: "Voice Capture";
     width: 540px;
     min-height: 300px;
-    // Janela sem contorno visível; fundo desenhado pelo contêiner interno arredondado.
     background: transparent;
     default-font-family: "Sans";
 
-    // ---- Propriedades de estado (controladas pelo Rust / lógica) ----
-    // Caminho SVG do osciloscópio (waveform) desenhado em tempo real.
+    // ---- State (driven by Rust / behavior scripts) ----
     in property <string> audio-path-data: "M 0 80 L 508 80";
-    // Texto e cor do status exibido no cabeçalho.
     in property <string> status-text: "Pronto para gravar";
     in property <brush> status-color: Theme.accent;
-    // Flags de estado: ocupado/processando, gravando e modo de tela de resultado.
     in property <bool> busy: false;
     in property <bool> is-recording: false;
     in property <bool> show-result: false;
-    // Textos de saída: transcrição e resposta do assistente.
     in property <string> transcript-text: "";
     in property <string> response-text: "";
-    // Estados do painel de configurações (editáveis na UI, in-out).
     in-out property <bool> show-settings: false;
-    in-out property <bool> respond-enabled: true; // responder com voz/TTS
-    in-out property <bool> hold-enabled: false;   // manter janela com resultado
-    // Controle da animação de abertura "sanfona" (de cima para baixo).
+    in-out property <bool> respond-enabled: true;
+    in-out property <bool> hold-enabled: false;
+    // Accordion opening animation (used by the capture window).
     in-out property <bool> reveal: false;
+    in property <bool> reveal-enabled: true;
 
-    // ---- Callbacks (eventos tratados pelo Rust) ----
-    callback send();               // iniciar gravação ou pausar+enviar
-    callback cancel();             // parar/abortar processos e voltar ao estado pronto
-    callback copy-text();          // copiar transcrição
-    callback close-app();          // fechar a janela
+    // ---- Callbacks (handled by Rust) ----
+    callback send();
+    callback cancel();
+    callback copy-text();
+    callback close-app();
     callback settings-toggled(bool);
-    callback respond-toggled(bool); // persistir toggle de resposta/TTS
-    callback hold-toggled(bool);    // persistir toggle de manter resultado
-    callback new-recording();       // voltar do resultado para nova gravação (cíclico)
+    callback respond-toggled(bool);
+    callback hold-toggled(bool);
+    callback new-recording();
 
-    // Contêiner raiz arredondado (fundo da janela, sem contornos), com parte inferior arredondada.
     Rectangle {
         width: 100%;
         height: 100%;
         background: Theme.background;
-        border-width: 0px;
         border-radius: 16px;
         clip: true;
 
-        // Contêiner de revelação: anima a abertura "sanfona" de cima para baixo.
+        // Reveal container: animates height when `reveal-enabled` is true.
         Rectangle {
             x: 0;
             y: 0;
             width: 100%;
-            height: root.reveal ? parent.height : 0px;
+            height: (!root.reveal-enabled || root.reveal) ? parent.height : 0px;
             clip: true;
-            animate height { duration: 220ms; easing: ease-out; }
 
-            // Conteúdo raiz: empilha seções verticalmente (VerticalBox = layout em coluna).
             VerticalBox {
                 x: 0;
                 y: 0;
@@ -70,279 +60,97 @@ export component VoiceCaptureWindow inherits Window {
                 padding: 16px;
                 spacing: 14px;
 
-        // ===== Cabeçalho: indicador de status (centro) + botão ajustes (direita) =====
-        // Rectangle: contêiner retangular (aqui transparente, só organiza o layout).
-        Rectangle {
-            background: transparent;
-            // HorizontalLayout: organiza filhos em linha (esquerda → direita).
-            HorizontalLayout {
-                alignment: stretch;
-                spacing: 8px;
-
-                // Espaçador esquerdo (ocupa espaço flexível para centralizar o status).
-                Rectangle { horizontal-stretch: 1; background: transparent; }
-
-                // Bloco central: bolinha indicadora + texto de status.
-                HorizontalBox {
-                    alignment: center;
-                    spacing: 8px;
-                    // Bolinha de status (Rectangle circular via border-radius).
-                    Rectangle {
-                        width: 10px;
-                        height: 10px;
-                        border-radius: 5px;
-                        background: root.status-color;
-                        opacity: root.busy ? 0.55 : 1.0;
-                        animate opacity { duration: 120ms; }
-                    }
-                    // Texto do status atual.
-                    Text {
-                        text: root.status-text;
-                        font-size: 16px;
-                        font-weight: 600;
-                        color: Theme.text-main;
-                        vertical-alignment: center;
+                StatusHeader {
+                    status-text: root.status-text;
+                    status-color: root.status-color;
+                    busy: root.busy;
+                    settings-open: root.show-settings;
+                    settings-clicked => {
+                        root.show-settings = !root.show-settings;
+                        root.settings-toggled(root.show-settings);
                     }
                 }
 
-                // Lado direito: botão de ajustes (⚙) alinhado ao fim.
-                Rectangle {
-                    horizontal-stretch: 1;
-                    background: transparent;
-                    HorizontalLayout {
-                        alignment: end;
-                        // "Botão" de ajustes (retângulo arredondado clicável).
-                        Rectangle {
-                            width: 30px;
-                            height: 30px;
-                            border-radius: 6px;
-                            background: settings-touch.has-hover ? Theme.surface-alt : transparent;
-                            animate background { duration: 120ms; }
-                            // Ícone do botão.
-                            Text {
-                                text: "⚙";
-                                font-size: 16px;
-                                color: root.show-settings ? Theme.accent : Theme.text-main;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                            // Área de toque/clique que abre/fecha o painel de configurações.
-                            settings-touch := TouchArea {
-                                clicked => {
-                                    root.show-settings = !root.show-settings;
-                                    root.settings-toggled(root.show-settings);
+                if root.show-settings : SettingsPanel {
+                    respond-enabled: root.respond-enabled;
+                    hold-enabled: root.hold-enabled;
+                    interactions-enabled: !root.busy && !root.is-recording;
+                    respond-toggled(enabled) => {
+                        root.respond-enabled = enabled;
+                        root.respond-toggled(enabled);
+                    }
+                    hold-toggled(enabled) => {
+                        root.hold-enabled = enabled;
+                        root.hold-toggled(enabled);
+                    }
+                }
+
+                // ===== Capture screen (not showing a result) =====
+                if !root.show-result : VerticalBox {
+                    spacing: 14px;
+
+                    WaveformView {
+                        border-size: 0px;
+                        audio-path-data: root.audio-path-data;
+                    }
+
+                    if root.response-text != "" : InfoCard {
+                        border-size: 0px;
+                        title: "Resposta";
+                        min-height: 90px;
+                        ScrollView {
+                            width: 100%;
+                            min-height: 60px;
+                            VerticalBox {
+                                Text {
+                                    width: 100%;
+                                    text: root.response-text;
+                                    color: Theme.text-strong;
+                                    font-size: 14px;
+                                    wrap: word-wrap;
                                 }
                             }
                         }
                     }
-                }
-            }
-        }
 
-        // ===== Painel de configurações (visível quando show-settings = true) =====
-        // "if ... : Componente" cria/remove o bloco conforme a condição.
-        if root.show-settings : Rectangle {
-            // Cartão do painel (sem contorno).
-            background: Theme.card-bg;
-            border-width: 0px;
-            border-radius: 8px;
-            // Conteúdo do painel em coluna.
-            VerticalLayout {
-                padding: 10px;
-                spacing: 8px;
-                // Título do painel.
-                Text {
-                    text: "Comportamentos";
-                    color: Theme.text-main;
-                    font-size: 13px;
-                    font-weight: 700;
-                }
-
-                // Linha/toggle: Resposta com voz (TTS).
-                Rectangle {
-                    height: 34px;
-                    border-radius: 6px;
-                    background: respond-touch.has-hover ? Theme.surface-alt : transparent;
-                    HorizontalLayout {
-                        padding-left: 10px;
-                        padding-right: 10px;
-                        alignment: space-between; // label à esquerda, valor à direita
-                        Text {
-                            text: "Resposta com voz (TTS)";
-                            color: Theme.text-main;
-                            font-size: 13px;
-                            vertical-alignment: center;
-                        }
-                        Text {
-                            text: root.respond-enabled ? "Ativado" : "Desativado";
-                            color: root.respond-enabled ? Theme.accent-success : Theme.text-main;
-                            font-size: 12px;
-                            font-weight: 600;
-                            vertical-alignment: center;
-                        }
-                    }
-                    // Clique alterna e persiste a configuração.
-                    respond-touch := TouchArea {
-                        enabled: !root.busy && !root.is-recording;
-                        clicked => {
-                            root.respond-enabled = !root.respond-enabled;
-                            root.respond-toggled(root.respond-enabled);
-                        }
+                    CaptureControls {
+                        busy: root.busy;
+                        is-recording: root.is-recording;
+                        cancel => { root.cancel(); }
+                        send => { root.send(); }
                     }
                 }
 
-                // Linha/toggle: Manter janela com resultado.
-                Rectangle {
-                    height: 34px;
-                    border-radius: 6px;
-                    background: hold-touch.has-hover ? Theme.surface-alt : transparent;
-                    HorizontalLayout {
-                        padding-left: 10px;
-                        padding-right: 10px;
-                        alignment: space-between;
-                        Text {
-                            text: "Manter janela com resultado";
-                            color: Theme.text-main;
-                            font-size: 13px;
-                            vertical-alignment: center;
-                        }
-                        Text {
-                            text: root.hold-enabled ? "Ativado" : "Desativado";
-                            color: root.hold-enabled ? Theme.accent-success : Theme.text-main;
-                            font-size: 12px;
-                            font-weight: 600;
-                            vertical-alignment: center;
-                        }
-                    }
-                    hold-touch := TouchArea {
-                        enabled: !root.busy && !root.is-recording;
-                        clicked => {
-                            root.hold-enabled = !root.hold-enabled;
-                            root.hold-toggled(root.hold-enabled);
-                        }
-                    }
-                }
-            }
-        }
+                // ===== Result screen (transcript) =====
+                if root.show-result : VerticalBox {
+                    spacing: 12px;
 
-        // ===== Tela de captura (quando NÃO está mostrando resultado) =====
-        if !root.show-result : VerticalBox {
-            spacing: 14px;
-
-            // Visualização do áudio/osciloscópio.
-            WaveformView {
-                border-size: 0px;
-                audio-path-data: root.audio-path-data;
-            }
-
-            // Cartão de resposta do assistente (aparece quando há texto de resposta).
-            if root.response-text != "" : InfoCard {
-                border-size: 0px;
-                title: "Resposta";
-                min-height: 90px;
-                // Área rolável para respostas longas.
-                ScrollView {
-                    width: 100%;
-                    min-height: 60px;
-                    VerticalBox {
-                        Text {
+                    InfoCard {
+                        border-size: 0px;
+                        title: "Transcrição";
+                        min-height: 140px;
+                        ScrollView {
                             width: 100%;
-                            text: root.response-text;
-                            color: Theme.text-strong;
-                            font-size: 14px;
-                            wrap: word-wrap;
+                            min-height: 100px;
+                            VerticalBox {
+                                Text {
+                                    width: 100%;
+                                    text: root.transcript-text;
+                                    color: Theme.text-strong;
+                                    font-size: 15px;
+                                    wrap: word-wrap;
+                                }
+                            }
                         }
                     }
-                }
-            }
 
-            // Bloco de controles (agrupa os botões principais, sem contorno).
-            Rectangle {
-                background: Theme.card-bg;
-                border-width: 0px;
-                border-radius: 12px;
-                // Linha horizontal centralizada com os botões.
-                HorizontalLayout {
-                    alignment: center;
-                    spacing: 20px;
-                    padding-left: 20px;
-                    padding-right: 20px;
-                    padding-top: 12px;
-                    padding-bottom: 12px;
-
-                    // Botão Parar (■): aborta gravação/processamento/espera e volta ao estado pronto.
-                    MediaButton {
-                        icon: "■";
-                        label: "";
-                        accent: Theme.accent-danger;
-                        size: 48px;
-                        enabled: true;
-                        clicked => { root.cancel(); }
-                    }
-
-                    // Botão principal (●/⏸): iniciar gravação ou pausar e enviar (conforme estado).
-                    MediaButton {
-                        icon: root.busy ? "…" : (root.is-recording ? "⏸" : "●");
-                        label: "";
-                        accent: root.busy ? Theme.border : (root.is-recording ? Theme.accent-success : Theme.accent);
-                        size: 48px;
-                        enabled: !root.busy;
-                        clicked => { root.send(); }
+                    ResultActions {
+                        copy-text => { root.copy-text(); }
+                        new-recording => { root.new-recording(); }
+                        close-app => { root.close-app(); }
                     }
                 }
             }
-        }
-
-        // ===== Tela de resultado/transcrição (quando show-result = true) =====
-        if root.show-result : VerticalBox {
-            spacing: 12px;
-
-            // Cartão com a transcrição final (rolável).
-            InfoCard {
-                border-size: 0px;
-                title: "Transcrição";
-                min-height: 140px;
-                ScrollView {
-                    width: 100%;
-                    min-height: 100px;
-                    VerticalBox {
-                        Text {
-                            width: 100%;
-                            text: root.transcript-text;
-                            color: Theme.text-strong;
-                            font-size: 15px;
-                            wrap: word-wrap;
-                        }
-                    }
-                }
-            }
-
-            // Linha de ações do resultado: copiar, nova gravação, fechar.
-            HorizontalLayout {
-                alignment: center;
-                spacing: 14px;
-                padding-top: 2px;
-                MediaButton {
-                    icon: "⎘";
-                    label: "Copiar";
-                    accent: Theme.accent;
-                    clicked => { root.copy-text(); }
-                }
-                MediaButton {
-                    icon: "●";
-                    label: "Novo";
-                    accent: Theme.recording;
-                    clicked => { root.new-recording(); }
-                }
-                MediaButton {
-                    icon: "✕";
-                    label: "Fechar";
-                    accent: Theme.accent-success;
-                    clicked => { root.close-app(); }
-                }
-            }
-            }
-        }
         }
     }
 }

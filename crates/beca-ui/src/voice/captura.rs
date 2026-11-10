@@ -12,6 +12,7 @@ use std::thread;
 use std::time::Duration;
 
 use crate::ui_loader;
+use crate::voice::view::VoiceView;
 
 const BEHAVIOR_LUAU: &str = include_str!("../../scripts/voice_behavior.luau");
 
@@ -231,10 +232,7 @@ impl Behavior {
 }
 
 fn apply_state(app: &ComponentInstance, st: &UiState) {
-    let _ = app.set_property("status-text", Value::String(st.status_text.clone().into()));
-    if let Some(c) = ui_loader::parse_color(&st.status_color) {
-        let _ = app.set_property("status-color", Value::Brush(c.into()));
-    }
+    VoiceView::new(app).set_status(&st.status_text, &st.status_color);
 }
 
 fn persist_voice_setting(key: &str, value: &str) {
@@ -626,15 +624,18 @@ ms=json.load(sys.stdin)
 m=next((x for x in ms if x.get("focused")), ms[0] if ms else None)
 if m:
   x=int(m.get("x",0) + (m.get("width",0)-{win_w})/2)
-  y=int(m.get("y",0))
+  y=int(m.get("y",0) + 40)
   print("X=%d;Y=%d" % (x,y))' 2>/dev/null)"
     if [ -n "${{X:-}}" ] && [ -n "${{Y:-}}" ]; then
-      hyprctl dispatch "hl.dsp.focus({{window = 'address:$addr'}})" >/dev/null 2>&1 || true
-      hyprctl dispatch "hl.dsp.window.move({{x=$X,y=$Y}})" >/dev/null 2>&1 || \
-      hyprctl dispatch movewindowpixel "exact $X $Y,address:$addr" >/dev/null 2>&1 || true
+      if [ "${{X:-}}" != "${{LASTX:-}}" ] || [ "${{Y:-}}" != "${{LASTY:-}}" ]; then
+        hyprctl dispatch "hl.dsp.focus({{window = 'address:$addr'}})" >/dev/null 2>&1 || true
+        hyprctl dispatch "hl.dsp.window.move({{x=$X,y=$Y}})" >/dev/null 2>&1 || \
+        hyprctl dispatch movewindowpixel "exact $X $Y,address:$addr" >/dev/null 2>&1 || true
+        LASTX=$X; LASTY=$Y
+      fi
     fi
   fi
-  sleep 0.25
+  sleep 0.5
 done
 "#
     );
@@ -680,6 +681,26 @@ pub fn run_capture_ui_with(
     theme: VoiceTheme,
     ui_texts: VoiceUiTexts,
 ) -> Result<CaptureOutcome, String> {
+    // Warm up STT/LLM in the background so the first user interaction doesn't
+    // pay the cold-start cost. Non-blocking: UI creation proceeds immediately.
+    {
+        let base_url = base_url.to_string();
+        let respond = respond;
+        let respond_cfg = respond_cfg.clone();
+        std::thread::spawn(move || {
+            // STT daemon keep-alive
+            let url = format!("{}/health", base_url.trim_end_matches('/'));
+            let _ = ureq::get(&url).call();
+            if respond {
+                // Warm up context builder + LLM (best-effort, ignore errors)
+                let _ = std::process::Command::new("bash")
+                    .arg("-c")
+                    .arg("command -v q-context_builder >/dev/null && q-context_builder assist >/dev/null 2>&1; command -v q-rs >/dev/null && q-rs run 'ping' >/dev/null 2>&1")
+                    .status();
+            }
+        });
+    }
+    let out_path = out_path;
     let t0 = std::time::Instant::now();
     let t_step = std::time::Instant::now();
     let behavior = Behavior::load_with(ui_texts);
@@ -822,14 +843,18 @@ pub fn run_capture_ui_with(
     eprintln!("[beca-voice][timing] audio stream ready(paused) in {:?} (total {:?})", t_step.elapsed(), t0.elapsed());
 
     let t_step = std::time::Instant::now();
-    let app = ui_loader::create("VoiceCaptureWindow").map_err(|e| e.to_string())?;
+    let component_name = std::env::var("BECA_VOICE_COMPONENT")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "VoiceCaptureWindow".to_string());
+    let app = ui_loader::create(&component_name).map_err(|e| e.to_string())?;
     eprintln!("[beca-voice][timing] ui create in {:?} (total {:?})", t_step.elapsed(), t0.elapsed());
     ui_loader::apply_theme_global(&app, &theme);
     apply_state(&app, &behavior.idle());
-    let _ = app.set_property("is-recording", Value::Bool(false));
-    let _ = app.set_property("respond-enabled", Value::Bool(respond));
-    let _ = app.set_property("hold-enabled", Value::Bool(hold));
-    let _ = app.set_property("show-settings", Value::Bool(false));
+    let view = VoiceView::new(&app);
+    view.idle();
+    view.set_settings(respond, hold);
+    view.set_show_settings(false);
     let outcome: Arc<Mutex<Option<CaptureOutcome>>> = Arc::new(Mutex::new(None));
     let finishing = Arc::new(AtomicBool::new(false));
     let generation: Arc<std::sync::atomic::AtomicU64> =
@@ -877,8 +902,7 @@ pub fn run_capture_ui_with(
                 let _ = stream_ctl.play();
                 recording.store(true, Ordering::Relaxed);
                 if let Some(app) = weak.upgrade() {
-                    let _ = app.set_property("is-recording", Value::Bool(true));
-                    let _ = app.set_property("busy", Value::Bool(false));
+                    VoiceView::new(&app).start_recording();
                     apply_state(&app, &recording_state);
                 }
                 return Value::Void;
@@ -909,18 +933,13 @@ pub fn run_capture_ui_with(
             cancel_flag.store(false, Ordering::SeqCst);
             let my_gen = generation.load(Ordering::SeqCst);
             let (respond_now, hold_now) = if let Some(app) = weak.upgrade() {
-                let _ = app.set_property("is-recording", Value::Bool(false));
-                let _ = app.set_property("busy", Value::Bool(true));
+                let view = VoiceView::new(&app);
+                view.begin_processing();
                 apply_state(&app, &transcribing_state);
-                let r = match app.get_property("respond-enabled") {
-                    Ok(Value::Bool(v)) => v,
-                    _ => respond_default,
-                };
-                let h = match app.get_property("hold-enabled") {
-                    Ok(Value::Bool(v)) => v,
-                    _ => hold,
-                };
-                (r, h)
+                (
+                    view.respond_enabled(respond_default),
+                    view.hold_enabled(hold),
+                )
             } else {
                 (respond_default, hold)
             };
@@ -951,9 +970,7 @@ pub fn run_capture_ui_with(
                         let transcript = text.clone();
                         let st = responding_state.clone();
                         let _ = weak.upgrade_in_event_loop(move |app| {
-                            let _ = app.set_property("show-result", Value::Bool(false));
-                            let _ = app.set_property("busy", Value::Bool(true));
-                            let _ = app.set_property("response-text", Value::String("".into()));
+                            VoiceView::new(&app).begin_response();
                             apply_state(&app, &st);
                         });
                         // animate waveform while responding
@@ -977,7 +994,7 @@ pub fn run_capture_ui_with(
                                 let answer_ui = answer.clone();
                                 let st = speaking_state.clone();
                                 let _ = weak.upgrade_in_event_loop(move |app| {
-                                    let _ = app.set_property("response-text", Value::String(answer_ui.into()));
+                                    VoiceView::new(&app).set_response(&answer_ui);
                                     apply_state(&app, &st);
                                 });
                                 // animate waveform while speaking (synthetic, same oscilloscope, changed label/color)
@@ -1002,8 +1019,7 @@ pub fn run_capture_ui_with(
                                 let st = success_state.clone();
                                 let idle = idle_state.clone();
                                 let _ = weak.upgrade_in_event_loop(move |app| {
-                                    let _ = app.set_property("busy", Value::Bool(false));
-                                    let _ = app.set_property("is-recording", Value::Bool(false));
+                                    VoiceView::new(&app).idle();
                                     apply_state(&app, &st);
                                 });
                                 finishing.store(false, Ordering::SeqCst);
@@ -1013,9 +1029,9 @@ pub fn run_capture_ui_with(
                                     return;
                                 }
                                 let _ = weak.upgrade_in_event_loop(move |app| {
-                                    let _ = app.set_property("busy", Value::Bool(false));
-                                    let _ = app.set_property("is-recording", Value::Bool(false));
-                                    let _ = app.set_property("response-text", Value::String("".into()));
+                                    let view = VoiceView::new(&app);
+                                    view.idle();
+                                    view.clear_response();
                                     apply_state(&app, &idle);
                                 });
                             }
@@ -1032,7 +1048,7 @@ pub fn run_capture_ui_with(
                                     status_color: "#f7768e".into(),
                                 };
                                 let _ = weak.upgrade_in_event_loop(move |app| {
-                                    let _ = app.set_property("busy", Value::Bool(false));
+                                    VoiceView::new(&app).set_busy(false);
                                     apply_state(&app, &err_state);
                                 });
                                 finishing.store(false, Ordering::SeqCst);
@@ -1048,15 +1064,13 @@ pub fn run_capture_ui_with(
                         }
                         let idle = idle_state.clone();
                         let _ = weak.upgrade_in_event_loop(move |app| {
+                            let view = VoiceView::new(&app);
                             if hold_now {
-                                let _ = app.set_property("busy", Value::Bool(false));
-                                let _ = app.set_property("show-result", Value::Bool(true));
-                                let _ = app.set_property("transcript-text", Value::String(text.into()));
+                                view.show_result(&text);
                                 apply_state(&app, &success_state);
                             } else {
-                                let _ = app.set_property("busy", Value::Bool(false));
-                                let _ = app.set_property("is-recording", Value::Bool(false));
-                                let _ = app.set_property("show-result", Value::Bool(false));
+                                view.idle();
+                                view.hide_result();
                                 apply_state(&app, &idle);
                             }
                         });
@@ -1072,8 +1086,7 @@ pub fn run_capture_ui_with(
                         // On error, allow retry from idle.
                         finishing.store(false, Ordering::SeqCst);
                         let _ = weak.upgrade_in_event_loop(move |app| {
-                            let _ = app.set_property("busy", Value::Bool(false));
-                            let _ = app.set_property("is-recording", Value::Bool(false));
+                            VoiceView::new(&app).idle();
                             apply_state(
                                 &app,
                                 &UiState {
@@ -1126,11 +1139,7 @@ pub fn run_capture_ui_with(
                 *o = Some(CaptureOutcome::Cancel);
             }
             if let Some(app) = weak.upgrade() {
-                let _ = app.set_property("busy", Value::Bool(false));
-                let _ = app.set_property("is-recording", Value::Bool(false));
-                let _ = app.set_property("show-result", Value::Bool(false));
-                let _ = app.set_property("response-text", Value::String("".into()));
-                let _ = app.set_property("transcript-text", Value::String("".into()));
+                VoiceView::new(&app).reset();
                 apply_state(&app, &idle_state);
             }
             Value::Void
@@ -1141,10 +1150,7 @@ pub fn run_capture_ui_with(
         let weak = app.as_weak();
         let _ = app.set_callback("copy-text", move |_args| {
             if let Some(app) = weak.upgrade() {
-                let text = match app.get_property("transcript-text") {
-                    Ok(Value::String(s)) => s.to_string(),
-                    _ => String::new(),
-                };
+                let text = VoiceView::new(&app).transcript();
                 if super::transcricao::copy_to_clipboard(&text) {
                     super::transcricao::notify("📋 Transcrição copiada");
                 } else {
@@ -1201,12 +1207,8 @@ pub fn run_capture_ui_with(
             let _ = stream_ctl.pause();
             finishing.store(false, Ordering::SeqCst);
             if let Some(app) = weak.upgrade() {
-                let _ = app.set_property("busy", Value::Bool(false));
-                let _ = app.set_property("is-recording", Value::Bool(false));
-                let _ = app.set_property("show-result", Value::Bool(false));
-                let _ = app.set_property("response-text", Value::String("".into()));
-                let _ = app.set_property("transcript-text", Value::String("".into()));
-                let _ = app.set_property("audio-path-data", Value::String("M 0 80 L 508 80".into()));
+                let view = VoiceView::new(&app);
+                view.reset();
                 apply_state(&app, &idle_state);
             }
             Value::Void
@@ -1260,7 +1262,7 @@ pub fn run_capture_ui_with(
             let weak2 = weak.clone();
             let _ = slint_interpreter::invoke_from_event_loop(move || {
                 if let Some(app) = weak2.upgrade() {
-                    let _ = app.set_property("audio-path-data", Value::String(path_str.into()));
+                    VoiceView::new(&app).set_audio_path(&path_str);
                 }
             });
             thread::sleep(Duration::from_millis(33));
@@ -1335,7 +1337,7 @@ pub fn run_capture_ui_with(
                     let weak2 = weak.clone();
                     let _ = slint_interpreter::invoke_from_event_loop(move || {
                         if let Some(app) = weak2.upgrade() {
-                            let _ = app.set_property("reveal", Value::Bool(false));
+                            VoiceView::new(&app).set_reveal(false);
                             let _ = app.hide();
                         }
                     });
@@ -1348,7 +1350,7 @@ pub fn run_capture_ui_with(
         });
     }
 
-    let _ = app.set_property("reveal", Value::Bool(false));
+    VoiceView::new(&app).set_reveal(false);
     let t_show = std::time::Instant::now();
     ui_loader::show(&app).map_err(|e| e.to_string())?;
     eprintln!("[beca-voice][timing] show() in {:?} (total {:?})", t_show.elapsed(), t0.elapsed());
@@ -1358,7 +1360,7 @@ pub fn run_capture_ui_with(
         std::thread::sleep(std::time::Duration::from_millis(20));
         let _ = slint_interpreter::invoke_from_event_loop(move || {
             if let Some(app) = weak_reveal.upgrade() {
-                let _ = app.set_property("reveal", Value::Bool(true));
+                VoiceView::new(&app).set_reveal(true);
             }
         });
     });

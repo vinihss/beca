@@ -85,6 +85,31 @@ impl Default for ThemeMetrics {
     }
 }
 
+impl Theme {
+    /// Map the config theme onto the UI-facing carrier used by `beca_ui`.
+    ///
+    /// This is the only config → UI conversion in the workspace; callers should
+    /// never rebuild the mapping by hand.
+    pub fn voice_theme(&self) -> beca_ui::voice::VoiceTheme {
+        beca_ui::voice::VoiceTheme {
+            background: self.colors.background.clone(),
+            text_main: self.colors.text_main.clone(),
+            card_bg: self.colors.card_bg.clone(),
+            card_border: self.colors.card_border.clone(),
+            surface: self.colors.surface.clone(),
+            surface_alt: self.colors.surface_alt.clone(),
+            border: self.colors.border.clone(),
+            text_strong: self.colors.text_strong.clone(),
+            accent: self.colors.accent.clone(),
+            accent_success: self.colors.accent_success.clone(),
+            accent_danger: self.colors.accent_danger.clone(),
+            recording: self.colors.recording.clone(),
+            radius: self.metrics.radius,
+            dark_mode: self.meta.variant != "light",
+        }
+    }
+}
+
 pub fn load_theme(paths: &BecaPaths, name: &str) -> (Theme, Option<PathBuf>) {
     let path = paths.theme_file(name);
     load_theme_from(&path)

@@ -607,6 +607,15 @@ fn handle_mod_request(req: &Value) -> Value {
                     Err(e) => json!({"ok": false, "error": e, "target": target}),
                 };
             }
+            "voice:assistant" | "voice:show-assistant" => {
+                return match ensure_resident_voice() {
+                    Ok(pid) => match send_voice_control("show-assistant") {
+                        Ok(_) => json!({"ok": true, "target": target, "mode": "resident", "pid": pid}),
+                        Err(e) => json!({"ok": false, "error": e, "target": target}),
+                    },
+                    Err(e) => json!({"ok": false, "error": e, "target": target}),
+                };
+            }
             "voice:hide" => {
                 return match send_voice_control("hide") {
                     Ok(_) => json!({"ok": true, "target": target}),

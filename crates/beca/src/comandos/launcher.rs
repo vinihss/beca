@@ -21,43 +21,10 @@ fn lua_err(e: mlua::Error) -> anyhow::Error {
     anyhow::anyhow!(e.to_string())
 }
 
-fn parse_hex_color(hex: &str) -> Option<slint::Color> {
-    let h = hex.trim().trim_start_matches('#');
-    if h.len() != 6 {
-        return None;
-    }
-    let r = u8::from_str_radix(&h[0..2], 16).ok()?;
-    let g = u8::from_str_radix(&h[2..4], 16).ok()?;
-    let b = u8::from_str_radix(&h[4..6], 16).ok()?;
-    Some(slint::Color::from_rgb_u8(r, g, b))
-}
-
 fn apply_beca_theme(app: &SearchWindow) {
     let resolved = beca_core::config::load();
-    let t = &resolved.theme;
-    let g = beca_ui::Theme::get(app);
-    let to_brush = |s: &str| -> slint::Brush {
-        parse_hex_color(s)
-            .map(slint::Brush::SolidColor)
-            .unwrap_or_else(|| slint::Brush::SolidColor(slint::Color::from_rgb_u8(0, 0, 0)))
-    };
-    let to_color = |s: &str| -> slint::Color {
-        parse_hex_color(s).unwrap_or_else(|| slint::Color::from_rgb_u8(0, 0, 0))
-    };
-    g.set_background(to_color(&t.colors.background));
-    g.set_text_main(to_color(&t.colors.text_main));
-    g.set_card_bg(to_color(&t.colors.card_bg));
-    g.set_card_border(to_color(&t.colors.card_border));
-    g.set_surface(to_brush(&t.colors.surface));
-    g.set_surface_alt(to_brush(&t.colors.surface_alt));
-    g.set_border(to_brush(&t.colors.border));
-    g.set_text_strong(to_brush(&t.colors.text_strong));
-    g.set_accent(to_brush(&t.colors.accent));
-    g.set_accent_success(to_brush(&t.colors.accent_success));
-    g.set_accent_danger(to_brush(&t.colors.accent_danger));
-    g.set_recording(to_brush(&t.colors.recording));
-    g.set_radius(t.metrics.radius as f32);
-    g.set_dark_mode(t.meta.variant != "light");
+    let tokens = beca_ui::theme::ThemeTokens::from_voice_theme(&resolved.theme.voice_theme());
+    tokens.apply_typed(&beca_ui::Theme::get(app));
 }
 
 pub fn control_socket_path() -> PathBuf {

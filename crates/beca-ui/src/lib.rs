@@ -5,6 +5,7 @@
 slint::include_modules!();
 
 pub mod search_window;
+pub mod theme;
 pub mod ui_loader;
 pub mod voice;
 pub mod voice_window;

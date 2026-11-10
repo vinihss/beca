@@ -1,0 +1,206 @@
+import { HorizontalBox, VerticalBox, ScrollView } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { InfoCard } from "info_card.slint";
+import { MediaButton } from "media_button.slint";
+import { WaveformView } from "waveform_view.slint";
+import { IconButton } from "icon_button.slint";
+
+// Shared voice window implementation. Concrete windows (`VoiceCaptureWindow`,
+// `VoiceAssistantWindow`) are thin aliases that only change the title and the
+// opening animation, so the whole layout/behaviour lives in a single place.
+
+// ===== Header: status indicator (center) + settings button (right) =====
+export component StatusHeader inherits Rectangle {
+    in property <string> status-text;
+    in property <brush> status-color;
+    in property <bool> busy: false;
+    in property <bool> settings-open: false;
+    callback settings-clicked();
+
+    background: transparent;
+
+    HorizontalLayout {
+        alignment: stretch;
+        spacing: 8px;
+
+        // Left spacer keeps the status pill centered.
+        Rectangle { horizontal-stretch: 1; background: transparent; }
+
+        HorizontalBox {
+            alignment: center;
+            spacing: 8px;
+            Rectangle {
+                width: 10px;
+                height: 10px;
+                border-radius: 5px;
+                background: root.status-color;
+                opacity: root.busy ? 0.55 : 1.0;
+            }
+            Text {
+                text: root.status-text;
+                font-size: 16px;
+                font-weight: 600;
+                color: Theme.text-main;
+                vertical-alignment: center;
+            }
+        }
+
+        // Right spacer + settings button.
+        Rectangle {
+            horizontal-stretch: 1;
+            background: transparent;
+            HorizontalLayout {
+                alignment: end;
+                IconButton {
+                    icon: "⚙";
+                    active: root.settings-open;
+                    clicked => { root.settings-clicked(); }
+                }
+            }
+        }
+    }
+}
+
+// ===== Behaviour toggle row (settings panel) =====
+export component SettingsToggleRow inherits Rectangle {
+    in property <string> label;
+    in property <bool> checked: false;
+    in property <bool> enabled: true;
+    callback toggled();
+
+    height: 34px;
+    border-radius: 6px;
+    background: (touch.has-hover && root.enabled) ? Theme.surface-alt : transparent;
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        alignment: space-between;
+        Text {
+            text: root.label;
+            color: Theme.text-main;
+            font-size: 13px;
+            vertical-alignment: center;
+        }
+        Text {
+            text: root.checked ? "Ativado" : "Desativado";
+            color: root.checked ? Theme.accent-success : Theme.text-main;
+            font-size: 12px;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.toggled(); }
+        mouse-cursor: pointer;
+    }
+}
+
+// ===== Settings panel =====
+export component SettingsPanel inherits Rectangle {
+    in property <bool> respond-enabled: true;
+    in property <bool> hold-enabled: false;
+    in property <bool> interactions-enabled: true;
+    callback respond-toggled(bool);
+    callback hold-toggled(bool);
+
+    background: Theme.card-bg;
+    border-radius: 8px;
+
+    VerticalLayout {
+        padding: 10px;
+        spacing: 8px;
+        Text {
+            text: "Comportamentos";
+            color: Theme.text-main;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        SettingsToggleRow {
+            label: "Resposta com voz (TTS)";
+            checked: root.respond-enabled;
+            enabled: root.interactions-enabled;
+            toggled => { root.respond-toggled(!root.respond-enabled); }
+        }
+        SettingsToggleRow {
+            label: "Manter janela com resultado";
+            checked: root.hold-enabled;
+            enabled: root.interactions-enabled;
+            toggled => { root.hold-toggled(!root.hold-enabled); }
+        }
+    }
+}
+
+// ===== Capture controls (stop / record-send) =====
+export component CaptureControls inherits Rectangle {
+    in property <bool> busy: false;
+    in property <bool> is-recording: false;
+    callback cancel();
+    callback send();
+
+    background: Theme.card-bg;
+    border-radius: 12px;
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: 20px;
+        padding-left: 20px;
+        padding-right: 20px;
+        padding-top: 12px;
+        padding-bottom: 12px;
+
+        // Stop: abort recording/processing and return to idle.
+        MediaButton {
+            icon: "■";
+            label: "";
+            accent: Theme.accent-danger;
+            size: 48px;
+            enabled: true;
+            clicked => { root.cancel(); }
+        }
+        // Primary: start recording, or pause and send.
+        MediaButton {
+            icon: root.busy ? "…" : (root.is-recording ? "⏸" : "●");
+            label: "";
+            accent: root.busy ? Theme.border : (root.is-recording ? Theme.accent-success : Theme.accent);
+            size: 48px;
+            enabled: !root.busy;
+            clicked => { root.send(); }
+        }
+    }
+}
+
+// ===== Result actions (copy / new / close) =====
+export component ResultActions inherits Rectangle {
+    callback copy-text();
+    callback new-recording();
+    callback close-app();
+
+    background: transparent;
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: 14px;
+        padding-top: 2px;
+        MediaButton {
+            icon: "⎘";
+            label: "Copiar";
+            accent: Theme.accent;
+            clicked => { root.copy-text(); }
+        }
+        MediaButton {
+            icon: "●";
+            label: "Novo";
+            accent: Theme.recording;
+            clicked => { root.new-recording(); }
+        }
+        MediaButton {
+            icon: "✕";
+            label: "Fechar";
+            accent: Theme.accent-success;
+            clicked => { root.close-app(); }
+        }
+    }
+}
