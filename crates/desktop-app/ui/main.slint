@@ -1,0 +1,36 @@
+import { DesktopButton, InfoCard, Theme } from "../../ui-lib/ui/library.slint";
+
+export { Theme }
+
+export component MainWindow inherits Window {
+    title: "Slint Application with Crates Folder";
+    width: 500px;
+    height: 400px;
+    background: Theme.background;
+
+    in property <string> card-title: "Loading via Luau...";
+    in property <string> button-text: "Click Here";
+    callback button-clicked(string);
+
+    VerticalLayout {
+        padding: 30px;
+        spacing: 20px;
+
+        HorizontalLayout {
+            alignment: space-between;
+            Text { text: "Organized Architecture"; font-size: 24px; color: Theme.text-main; }
+            DesktopButton {
+                text: Theme.dark-mode ? "☀️" : "🌙";
+                clicked => { Theme.dark-mode = !Theme.dark-mode; }
+            }
+        }
+
+        InfoCard { title: root.card-title; }
+
+        DesktopButton {
+            text: root.button-text;
+            height: 40px;
+            clicked => { root.button-clicked("UI Event Triggered!"); }
+        }
+    }
+}

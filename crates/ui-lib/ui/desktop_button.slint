@@ -1,0 +1,30 @@
+import { Theme } from "theme.slint";
+
+/// Standard desktop action button (guide-compatible API + optional enabled).
+export component DesktopButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    callback clicked;
+
+    height: 38px;
+    min-width: 96px;
+    border-radius: Theme.radius;
+    animate background { duration: 150ms; }
+    opacity: root.enabled ? 1.0 : 0.45;
+    background: !root.enabled ? #007ACC
+        : touch-area.pressed ? #005999
+        : touch-area.has-hover ? #0088E6
+        : #007ACC;
+
+    touch-area := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        text: root.text;
+        color: white;
+        vertical-alignment: center;
+        horizontal-alignment: center;
+    }
+}

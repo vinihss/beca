@@ -1,0 +1,24 @@
+[package]
+name = "voice-capture"
+edition.workspace = true
+version.workspace = true
+
+[lib]
+name = "voice_capture"
+path = "src/lib.rs"
+
+[[bin]]
+name = "voice-capture"
+path = "src/main.rs"
+
+[dependencies]
+ui-lib = { path = "../ui-lib" }
+beca-core = { path = "../beca-core" }
+slint.workspace = true
+cpal.workspace = true
+clap.workspace = true
+hound.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ureq.workspace = true
+mlua.workspace = true

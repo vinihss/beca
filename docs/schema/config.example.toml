@@ -1,0 +1,36 @@
+# Beca — config principal (XDG)
+# Local: $XDG_CONFIG_HOME/beca/config.toml  (default: ~/.config/beca/config.toml)
+# Precedência: CLI flags > variáveis de ambiente > config.toml > defaults embutidos
+
+[core]
+# Tema ativo (nome de arquivo em themes/<nome>.toml ou "default")
+theme = "default"
+# Nível de log: error|warn|info|debug
+log_level = "info"
+
+[shell]
+# Integração Hyprland/Wayland (reservado para módulos de shell)
+# ex.: layer, anchor, exclusividade — definidos por módulo quando aplicável
+
+[modules.voice]
+# Módulo de captura/transcrição (componente ui-lib: VoiceCaptureWindow)
+enabled = true
+daemon_url = "http://127.0.0.1:4100"   # override: env VOICE_DAEMON_URL
+# comportamento padrão: "pipe" (stdout+exit, compat Hyprland binds) | "hold" (UI com resultado)
+mode = "pipe"
+prefer_sample_rate = 16000
+channels = 1
+# script Lua de comportamento (opcional, override em disco; fallback embutido)
+# script = "scripts/voice.lua"          # relativo a $XDG_CONFIG_HOME/beca/
+
+[modules.voice.ui]
+# Overrides de UI/params sem recompilar (injetados como props)
+title = "Voice Capture"
+status_recording = "Gravando..."
+status_transcribing = "Transcrevendo áudio..."
+
+# Futuros módulos (multi-módulo)
+# [modules.launcher]
+# enabled = true
+# [modules.bar]
+# enabled = false

@@ -1,0 +1,42 @@
+import { DesktopButton, InfoCard, Theme } from "../../ui-lib/ui/library.slint";
+
+export { Theme }
+
+export component DashboardWindow inherits Window {
+    title: "System Performance Monitoring";
+    width: 650px;
+    height: 500px;
+    background: Theme.background;
+
+    // Streaming state parameters
+    in property <string> cpu-status: "Checking Status...";
+    in property <string> disk-status: "Checking Status...";
+    in property <string> network-status: "Checking Status...";
+
+    callback refresh-triggered();
+
+    VerticalLayout {
+        padding: 30px;
+        spacing: 20px;
+
+        HorizontalLayout {
+            alignment: space-between;
+            Text { text: "Live Metrics"; font-size: 22px; font-weight: 700; color: Theme.text-main; }
+            DesktopButton { text: "Refresh Metrics"; height: 32px; clicked => { root.refresh-triggered(); } }
+        }
+
+        // Responsive grid-like flex column structure
+        VerticalLayout {
+            spacing: 12px;
+
+            InfoCard { title: "Processor Node"; }
+            HorizontalLayout { padding-left: 16px; Text { text: root.cpu-status; color: Theme.text-main; } }
+
+            InfoCard { title: "Storage Volumes"; }
+            HorizontalLayout { padding-left: 16px; Text { text: root.disk-status; color: Theme.text-main; } }
+
+            InfoCard { title: "Network Interfaces"; }
+            HorizontalLayout { padding-left: 16px; Text { text: root.network-status; color: Theme.text-main; } }
+        }
+    }
+}

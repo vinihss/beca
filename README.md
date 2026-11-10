@@ -1,38 +1,32 @@
-# Slint Rust Template
+# beca — shell UI para Hyprland/Wayland (Rust + Slint + Lua)
 
-A template for a Rust application that's using [Slint](https://slint.rs/) for the user interface.
+**beca** é um shell UI modular para Hyprland/Wayland: CLI único, componentes Slint reutilizáveis (`ui-lib`), ações padrão em Rust e scripts **Lua** configuráveis. Temas e parâmetros ajustáveis **sem recompilar** (XDG). Merge de `shell-scripting-starter` incorporado.
 
-## About
+## CLI
+```bash
+beca mod launcher:show                  # launcher de apps (SearchWindow + .desktop)
+beca mod voice:show [--hold]            # captura/transcrição (UI)
+beca mod voice:transcribe -i audio.wav  # transcreve arquivo (pipe/stdout)
+```
+Config: `$XDG_CONFIG_HOME/beca/config.toml` · Temas: `$XDG_CONFIG_HOME/beca/themes/<nome>.toml` (precedência CLI > ENV > config > defaults).
 
-This template helps you get started developing a Rust application with Slint as toolkit
-for the user interface. It demonstrates the integration between the `.slint` UI markup and
-Rust code, how to react to callbacks, get and set properties, and use basic widgets.
+## Rodar (workspace)
+```bash
+cargo run -p beca -- mod launcher:show
+cargo run -p beca -- mod voice:show --hold
+cargo run -p beca -- mod voice:transcribe -i /tmp/arquivo.wav
+cargo build --release -p beca                     # → target/release/beca
+# baseline/engines
+cargo run -p voice-capture -- --help
+cargo run -p desktop-app --bin sdk-run -- voice-sdk.luau [--test]
+cargo test -p beca-core
+```
 
-## Usage
+## Crates
+- `beca` (CLI), `beca-core` (config/tema XDG), `beca-apps` (apps/.desktop), `ui-lib` (kit: SearchWindow, VoiceCaptureWindow…), `voice-capture` (engine voz), `desktop-app`, `examples-runner`.
 
-1. Install Rust by following its [getting-started guide](https://www.rust-lang.org/learn/get-started).
-   Once this is done, you should have the `rustc` compiler and the `cargo` build system installed in your `PATH`.
-2. Download and extract the [ZIP archive of this repository](https://github.com/slint-ui/slint-rust-template/archive/refs/heads/main.zip).
-3. Rename the extracted directory and change into it:
-    ```
-    mv slint-rust-template-main my-project
-    cd my-project    
-    ```
-4. Build with `cargo`:
-    ```
-    cargo build
-    ```
-5. Run the application binary:
-    ```
-    cargo run
-    ```
-
-We recommend using an IDE for development, along with our [LSP-based IDE integration for `.slint` files](https://github.com/slint-ui/slint/blob/master/tools/lsp/README.md). You can also load this project directly in [Visual Studio Code](https://code.visualstudio.com) and install our [Slint extension](https://marketplace.visualstudio.com/items?itemName=Slint.slint).
-
-## Next Steps
-
-We hope that this template helps you get started, and that you enjoy exploring making user interfaces with Slint. To learn more
-about the Slint APIs and the `.slint` markup language, check out our [online documentation](https://slint.dev/docs).
-
-Don't forget to edit this readme to replace it by yours, and edit the `name =` field in `Cargo.toml` to match the name of your
-project.
+## Docs
+- `ARCHITECTURE.md` — conceito, CLI, daemon Hyprland/Wayland (alvo), fases
+- `AGENTS.md` — comandos/gotchas
+- `docs/schema/` — `config.example.toml`, `theme.default.example.toml`
+- `scripts/launcher.lua` — launcher de referência
