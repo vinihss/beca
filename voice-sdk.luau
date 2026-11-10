@@ -1,10 +1,10 @@
 -- voice-sdk.luau
--- Exemplo: componente VoiceCaptureWindow "chamado" via SDK Lua (runtime em fase 2)
--- Rode: cargo run -p desktop-app --bin sdk-run -- voice-sdk.luau --test
--- ou (GUI): cargo run -p desktop-app --bin sdk-run -- voice-sdk.luau
+-- Exemplo: componente VoiceCaptureWindow via runtime unificado beca.*
+-- Rode (GUI): cargo run -p beca -- run voice-sdk.luau
+-- ou com bin antigo: cargo run -p desktop-app --bin sdk-run -- voice-sdk.luau
 
-local daemon = VOICE_DAEMON_URL or "http://127.0.0.1:4100"
-local app = sdk.window("VoiceCaptureWindow")
+local daemon = (beca.voice.config().daemon_url) or "http://127.0.0.1:4100"
+local app = beca.ui.window("VoiceCaptureWindow")
 
 -- Configurar props do componente (contrato da ui-lib)
 app:set("status-text", "Pronto para capturar")
@@ -43,8 +43,8 @@ app:on("close-app", function()
   app:call("app.close")
 end)
 
--- Também é possível usar sdk.transcribe diretamente (sem janela)
--- local t = sdk.transcribe("/tmp/opencode/test-voice.wav", daemon)
+-- Também é possível usar beca.voice.transcribe diretamente (sem janela)
+-- local t = beca.voice.transcribe("/tmp/opencode/test-voice.wav", daemon)
 -- print("[LUA] transcribe direct: " .. tostring(t))
 
 print("[LUA] script carregado. Chamando app:run()")

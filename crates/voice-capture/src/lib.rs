@@ -51,9 +51,36 @@ fn parse_hex_color(hex: &str) -> Option<slint::Color> {
     Some(slint::Color::from_rgb_u8(r, g, b))
 }
 
+struct VoiceUiTexts {
+    status_recording: Option<String>,
+    status_transcribing: Option<String>,
+}
+
+impl VoiceUiTexts {
+    fn from_beca_config() -> Self {
+        let resolved = beca_core::load();
+        let ui = &resolved.config.modules.voice.ui;
+        let rec = if ui.status_recording.trim().is_empty() {
+            None
+        } else {
+            Some(ui.status_recording.clone())
+        };
+        let tr = if ui.status_transcribing.trim().is_empty() {
+            None
+        } else {
+            Some(ui.status_transcribing.clone())
+        };
+        Self {
+            status_recording: rec,
+            status_transcribing: tr,
+        }
+    }
+}
+
 struct Behavior {
     lua: Lua,
     module: Option<Table>,
+    ui: VoiceUiTexts,
 }
 
 impl Behavior {
@@ -69,7 +96,11 @@ impl Behavior {
         } else {
             eprintln!("[voice-capture] luau behavior loaded");
         }
-        Self { lua, module }
+        Self {
+            lua,
+            module,
+            ui: VoiceUiTexts::from_beca_config(),
+        }
     }
 
     fn call_state(&self, func: &str, arg: Option<&str>, fallback: UiState) -> UiState {
@@ -107,25 +138,33 @@ impl Behavior {
     }
 
     fn recording(&self) -> UiState {
-        self.call_state(
+        let mut st = self.call_state(
             "on_recording",
             None,
             UiState {
                 status_text: "Gravando...".into(),
                 status_color: slint::Brush::SolidColor(slint::Color::from_rgb_u8(247, 118, 142)),
             },
-        )
+        );
+        if let Some(t) = &self.ui.status_recording {
+            st.status_text = t.clone();
+        }
+        st
     }
 
     fn transcribing(&self) -> UiState {
-        self.call_state(
+        let mut st = self.call_state(
             "on_transcribing",
             None,
             UiState {
                 status_text: "Enviando para transcrição...".into(),
                 status_color: slint::Brush::SolidColor(slint::Color::from_rgb_u8(122, 162, 247)),
             },
-        )
+        );
+        if let Some(t) = &self.ui.status_transcribing {
+            st.status_text = t.clone();
+        }
+        st
     }
 
     fn success(&self, text: &str) -> UiState {

@@ -7,6 +7,9 @@
 beca mod launcher:show                  # launcher de apps (SearchWindow + .desktop)
 beca mod voice:show [--hold]            # captura/transcrição (UI)
 beca mod voice:transcribe -i audio.wav  # transcreve arquivo (pipe/stdout)
+beca run script.lua [args...]           # executa script com runtime beca.*
+beca daemon                             # daemon IPC (unix socket) + bridge base
+beca ping                               # verifica daemon
 ```
 Config: `$XDG_CONFIG_HOME/beca/config.toml` · Temas: `$XDG_CONFIG_HOME/beca/themes/<nome>.toml` (precedência CLI > ENV > config > defaults).
 

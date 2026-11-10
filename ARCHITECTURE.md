@@ -51,11 +51,12 @@ crates/
   examples-runner/        wizard/dashboard
 docs/schema/              config/theme exemplos · scripts/launcher.lua
 ```
-- Runtime `beca` (unificado, base): namespace global `beca.*` por domínio (`ui/apps/voice/events/system/hyprland`); scripts de módulo carregados de `$XDG_CONFIG_HOME/beca/scripts/<mod>.lua` com fallback embutido (`launcher.lua`). `desktop-app`/`sdk-run` mantém API `sdk.window/set/on/call/run` (MVP) → convergir para `beca.*`.
+- Runtime `beca` (unificado): namespace global `beca.*` por domínio (`ui/apps/voice/events/system/hyprland` + `runtime/hooks`); scripts de módulo de `$XDG_CONFIG_HOME/beca/scripts/<mod>.lua` com fallback embutido. Capacidades: `beca.system`, `beca.voice` (transcribe/config), `beca.events` (on/off/emit), `beca.runtime` (config/theme/paths/reload), `beca.ui.window/run/quit`, `beca.hyprland` (dispatch/exec `{ok,response}` via `.socket.sock`, `read_events` via `.socket2.sock`), hooks `on_load`/`on_unload`. `desktop-app`/`sdk-run` legado → convergir/aposentar.
 - `mlua` lua54 (vendored). Launcher funcional via `beca mod launcher:show`.
 
-## 5. Daemon de comunicação Hyprland/Wayland (componente central, alvo)
-Necessário para o shell ser integrado ao compositor (não apenas janelas soltas):
+## 5. Daemon de comunicação Hyprland/Wayland (componente central, em andamento)
+- **Base implementada (`beca daemon`)**: processo longo com IPC local unix socket (`$XDG_RUNTIME_DIR/beca/beca.sock`, JSON lines). Requests: `ping`, `version`, `hyprland.dispatch`, `hyprland.socket_paths`. Cliente: `beca ping`. Runtime `beca.hyprland` já integra sockets Hyprland (`dispatch`/`read_events`).
+- **Alvo (completar):** routing de `beca mod ...` via daemon, streaming `.socket2.sock` → `beca.events`, lifecycle/reload de módulos, layer-shell/superfícies Wayland, API `beca.hyprland` orientada a eventos.
 
 ```text
 Hyprland  <──IPC sockets──>  [beca daemon / compositor bridge]  <──unix socket──>  beca mod ... (cliente)
@@ -64,15 +65,14 @@ Wayland   <──protocolos──>        │  eventos + dispatch + layer-shell
                          runtime/módulos + ui-lib (superfícies shell)
 ```
 - **Hyprland IPC:** `$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock` (comandos/dispatch/`hyprctl`) e `.socket2.sock` (eventos: workspace, janela ativa, monitor…).
-- **Wayland/layer-shell:** superfícies de shell (bar/overlay/launcher) via `wlr-layer-shell` e protocolos relevantes (ancora/exclusividade) integradas às janelas Slint.
-- **Modo daemon:** `beca daemon` (processo longo) mantém conexões/estado, expõe IPC local para o CLI, gerencia lifecycle/reload de módulos/scripts e multiplexa eventos. API de script: `beca.hyprland` / ações padrão de compositor.
-- Crate alvo: `beca-compositor`/`beca-daemon` (serviço Rust privilegiado).
+- **Wayland/layer-shell:** superfícies de shell (bar/overlay/launcher) via `wlr-layer-shell` e protocolos relevantes integrados às janelas Slint.
+- **Modo daemon:** `beca daemon` mantém conexões/estado, expõe IPC local, gerencia lifecycle/reload e multiplexa eventos. API de script: `beca.hyprland` / ações padrão de compositor.
 
 ## 6. Migração (fases)
 1. **Docs + schema + merge** — `beca` CLI, `beca-core`, `beca-apps`, `SearchWindow`, launcher/voice integrados. **(feito)**
 2. **Consolidar voice** — módulo nativo (retirar delegação), capacidades `record/transcribe` no runtime.
 3. **Tema runtime** — tokens `Theme` setáveis + aplicar tema carregado.
-4. **Runtime unificado** — `beca.*` por domínio, scripts em disco (XDG), lifecycle/reload. **(base feita no `beca`: domínios + load XDG/fallback p/ launcher; falta expandir capacidades/reload e convergir `sdk-run`)**
+4. **Runtime unificado** — `beca.*` por domínio, scripts em disco (XDG), lifecycle/reload. **(expandido: `system/voice/events/runtime/hooks`, `beca.ui.window/run/quit`, `beca run`, reload básico e hooks; voice UI textos config-driven parcial; falta lifecycle em contexto vivo, `beca.hyprland` e aposentar `sdk-run`)**
 5. **Daemon Hyprland/Wayland** — IPC compositor, layer-shell, `beca.hyprland`, binds/eventos.
 6. **Módulos adicionais** — bar, notifications, etc.
 

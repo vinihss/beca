@@ -58,7 +58,7 @@ fn transcribe_file(base_url: &str, audio_path: &Path) -> Result<String, String> 
 
 enum AppHandle {
     VoiceCapture(ui_lib::VoiceCaptureWindow),
-    Stub(String),
+    Stub,
 }
 
 impl AppHandle {
@@ -201,44 +201,84 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let script_path = match argv.next() {
         Some(p) => p,
         None => {
-            eprintln!("usage: sdk-run <script.luau> [--test]");
+            eprintln!("usage: sdk-run <script> [--test]  (legacy; prefer: beca run <script>)");
             std::process::exit(1);
         }
     };
     let test = argv.any(|a| a == "--test");
     TEST_MODE.store(test, Ordering::Relaxed);
+    eprintln!("[sdk-run] legacy runner; prefer `beca run` for unified beca.* runtime");
 
     let lua = Lua::new();
+
+    let window_fn = lua.create_function(|_, name: String| -> mlua::Result<AppUserData> {
+        if TEST_MODE.load(Ordering::Relaxed) {
+            let _ = name;
+            return Ok(AppUserData(AppHandle::Stub));
+        }
+        match name.as_str() {
+            "VoiceCaptureWindow" => {
+                let app = ui_lib::VoiceCaptureWindow::new()
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                Ok(AppUserData(AppHandle::VoiceCapture(app)))
+            }
+            _ => Err(mlua::Error::RuntimeError(format!("unknown window: {name}"))),
+        }
+    })?;
+
+    let transcribe_fn = lua.create_function(
+        |lua, (path, url): (String, Option<String>)| -> mlua::Result<Value> {
+            let base = url.unwrap_or_else(|| "http://127.0.0.1:4100".to_string());
+            match transcribe_file(&base, Path::new(&path)) {
+                Ok(t) => Ok(Value::String(lua.create_string(&t)?)),
+                Err(e) => Err(mlua::Error::RuntimeError(e)),
+            }
+        },
+    )?;
+
+    // legacy sdk namespace
     let sdk = lua.create_table()?;
-    sdk.set(
-        "window",
-        lua.create_function(|_, name: String| -> mlua::Result<AppUserData> {
-            if TEST_MODE.load(Ordering::Relaxed) {
-                return Ok(AppUserData(AppHandle::Stub(name)));
+    sdk.set("window", window_fn.clone())?;
+    sdk.set("transcribe", transcribe_fn.clone())?;
+
+    // beca.* namespace (compat/convergence)
+    let beca = lua.create_table()?;
+    let ui = lua.create_table()?;
+    ui.set("window", window_fn)?;
+    ui.set(
+        "run",
+        lua.create_function(|_, ()| {
+            if !TEST_MODE.load(Ordering::Relaxed) {
+                let _ = slint::run_event_loop();
             }
-            match name.as_str() {
-                "VoiceCaptureWindow" => {
-                    let app = ui_lib::VoiceCaptureWindow::new()
-                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                    Ok(AppUserData(AppHandle::VoiceCapture(app)))
-                }
-                _ => Err(mlua::Error::RuntimeError(format!("unknown window: {name}"))),
-            }
+            Ok(())
         })?,
     )?;
-    sdk.set(
-        "transcribe",
-        lua.create_function(
-            |lua, (path, url): (String, Option<String>)| -> mlua::Result<Value> {
-                let base = url.unwrap_or_else(|| "http://127.0.0.1:4100".to_string());
-                match transcribe_file(&base, Path::new(&path)) {
-                    Ok(t) => Ok(Value::String(lua.create_string(&t)?)),
-                    Err(e) => Err(mlua::Error::RuntimeError(e)),
-                }
-            },
-        )?,
+    ui.set(
+        "quit",
+        lua.create_function(|_, ()| {
+            if !TEST_MODE.load(Ordering::Relaxed) {
+                let _ = slint::quit_event_loop();
+            }
+            Ok(())
+        })?,
     )?;
+    let voice = lua.create_table()?;
+    voice.set("transcribe", transcribe_fn)?;
+    voice.set(
+        "config",
+        lua.create_function(|lua, ()| {
+            let t = lua.create_table()?;
+            t.set("daemon_url", "http://127.0.0.1:4100")?;
+            t.set("mode", "pipe")?;
+            Ok(t)
+        })?,
+    )?;
+    beca.set("ui", ui)?;
+    beca.set("voice", voice)?;
+
     lua.globals().set("sdk", sdk)?;
+    lua.globals().set("beca", beca)?;
     lua.globals()
         .set("VOICE_DAEMON_URL", "http://127.0.0.1:4100")?;
 
