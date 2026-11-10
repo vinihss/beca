@@ -1,6 +1,6 @@
 # Beca — tema (runtime, sem recompilar)
 # Local: $XDG_CONFIG_HOME/beca/themes/<nome>.toml
-# Tokens injetados nas propriedades do Theme global (ui-lib) na inicialização.
+# Tokens injetados nas propriedades do Theme global (beca-ui) na inicialização.
 # Requer que os tokens do Theme sejam setáveis em runtime (in-out/in) — ajuste de implementação.
 
 [meta]

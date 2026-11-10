@@ -12,12 +12,10 @@ anyhow = "1"
 clap.workspace = true
 mlua.workspace = true
 slint.workspace = true
+slint-interpreter.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 beca-core = { path = "../beca-core" }
 beca-apps = { path = "../beca-apps" }
-ui-lib = { path = "../ui-lib" }
-voice-capture = { path = "../voice-capture" }
+beca-ui = { path = "../beca-ui" }
 
-[build-dependencies]
-slint-build.workspace = true

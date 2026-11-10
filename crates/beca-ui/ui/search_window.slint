@@ -1,0 +1,105 @@
+import { LineEdit, Button, ScrollView } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+
+export struct AppEntry {
+    name: string,
+    icon: image,
+}
+
+/// Search/launcher window (module: launcher/apps).
+export component SearchWindow inherits Window {
+    title: "beca";
+    width: 640px;
+    height: 460px;
+    background: #00000000;
+    no-frame: true;
+
+    in-out property <string> placeholder: "Search...";
+    in-out property <[AppEntry]> results: [];
+
+    callback search_requested(string);
+    callback result_selected(string);
+
+    forward-focus: search-input;
+
+    Rectangle {
+        background: Theme.card-bg;
+        border-radius: 16px;
+        border-width: 1px;
+        border-color: Theme.card-border;
+
+        VerticalLayout {
+            padding: 18px;
+            spacing: 12px;
+
+            Text {
+                text: "Search";
+                color: Theme.text-main;
+                font-size: 20px;
+                font-weight: 700;
+            }
+
+            search-input := LineEdit {
+                placeholder-text: root.placeholder;
+                edited(text) => { root.search_requested(text); }
+                accepted(text) => { root.search_requested(text); }
+            }
+
+            Text {
+                text: "Type to filter. Press Enter to search. Select a result to launch it.";
+                color: Theme.text-main;
+                font-size: 12px;
+                opacity: 0.7;
+            }
+
+            ScrollView {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    spacing: 6px;
+                    for result in root.results: TouchArea {
+                        height: 42px;
+                        width: 100%;
+                        clicked => { root.result_selected(result.name); }
+                        Rectangle {
+                            background: parent.has-hover ? Theme.surface : Theme.surface-alt;
+                            border-radius: 8px;
+                            animate background { duration: 100ms; }
+
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                spacing: 10px;
+                                alignment: start;
+
+                                Image {
+                                    width: 24px;
+                                    height: 24px;
+                                    source: result.icon;
+                                    image-fit: contain;
+                                    vertical-alignment: center;
+                                    visible: result.icon.width > 0;
+                                }
+
+                                Text {
+                                    text: result.name;
+                                    color: Theme.text-main;
+                                    vertical-alignment: center;
+                                    font-size: 14px;
+                                    overflow: elide;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                alignment: end;
+                Button {
+                    text: "Close";
+                    clicked => { root.hide(); }
+                }
+            }
+        }
+    }
+}

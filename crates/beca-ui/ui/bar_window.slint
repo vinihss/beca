@@ -1,0 +1,162 @@
+import { Theme } from "theme.slint";
+import { ClockWidget } from "clock_widget.slint";
+import { LauncherWidget } from "launcher_widget.slint";
+import { VolumeWidget } from "volume_widget.slint";
+import { VoiceWidget } from "voice_widget.slint";
+
+/// Bar window (top/bottom) divided into 3 sections: left, center, right.
+/// Each section has configurable alignment and can host widgets (clock/launcher/volume/voice).
+export component BarWindow inherits Window {
+    in-out property <string> position: "top"; // "top" | "bottom"
+    in-out property <string> clock-text: "--:--";
+    in-out property <bool> show-launcher: true;
+    in-out property <bool> show-clock: true;
+    in-out property <string> launcher-label: "Apps";
+    in-out property <bool> show-volume-out: true;
+    in-out property <bool> show-volume-in: true;
+    in-out property <string> volume-out-text: "--%";
+    in-out property <string> volume-in-text: "--%";
+    in-out property <bool> volume-out-muted: false;
+    in-out property <bool> volume-in-muted: false;
+    in-out property <bool> show-voice: true;
+    in-out property <string> voice-label: "Voice";
+
+    // Section placement: "left" | "center" | "right"
+    in-out property <string> clock-section: "center";
+    in-out property <string> launcher-section: "left";
+    in-out property <string> volume-out-section: "right";
+    in-out property <string> volume-in-section: "right";
+    in-out property <string> voice-section: "left";
+
+    // Section alignment: "start" | "center" | "end"
+    in-out property <string> left-align: "start";
+    in-out property <string> center-align: "center";
+    in-out property <string> right-align: "end";
+    in-out property <float> background-opacity: 1.0;
+    in-out property <bool> show-border: false;
+    callback launcher-clicked();
+    callback voice-clicked();
+
+    title: "beca-bar";
+    no-frame: true;
+    background: transparent;
+    // default size; runtime may override/position (layer-shell in future)
+    preferred-width: 800px;
+    min-width: 320px;
+    height: 34px;
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: Theme.card-bg.with-alpha(root.background-opacity);
+        border-width: root.show-border ? 1px : 0px;
+        border-color: root.show-border ? Theme.card-border : transparent;
+        border-radius: 0px;
+
+        HorizontalLayout {
+            padding-left: 8px;
+            padding-right: 8px;
+            spacing: 4px;
+            alignment: stretch;
+
+            // Left section
+            Rectangle {
+                horizontal-stretch: 1;
+                background: transparent;
+                HorizontalLayout {
+                    width: 100%;
+                    height: 100%;
+                    spacing: 4px;
+                    alignment: root.left-align == "center" ? center : (root.left-align == "end" ? end : start);
+                    if root.show-launcher && root.launcher-section == "left": LauncherWidget {
+                        label: root.launcher-label;
+                        clicked => { root.launcher-clicked(); }
+                    }
+                    if root.show-voice && root.voice-section == "left": VoiceWidget {
+                        label: root.voice-label;
+                        clicked => { root.voice-clicked(); }
+                    }
+                    if root.show-clock && root.clock-section == "left": ClockWidget {
+                        time-text: root.clock-text;
+                    }
+                    if root.show-volume-out && root.volume-out-section == "left": VolumeWidget {
+                        label: "󰕾";
+                        value-text: root.volume-out-text;
+                        muted: root.volume-out-muted;
+                    }
+                    if root.show-volume-in && root.volume-in-section == "left": VolumeWidget {
+                        label: "󰍬";
+                        value-text: root.volume-in-text;
+                        muted: root.volume-in-muted;
+                    }
+                }
+            }
+
+            // Center section
+            Rectangle {
+                horizontal-stretch: 1;
+                background: transparent;
+                HorizontalLayout {
+                    width: 100%;
+                    height: 100%;
+                    spacing: 4px;
+                    alignment: root.center-align == "start" ? start : (root.center-align == "end" ? end : center);
+                    if root.show-launcher && root.launcher-section == "center": LauncherWidget {
+                        label: root.launcher-label;
+                        clicked => { root.launcher-clicked(); }
+                    }
+                    if root.show-voice && root.voice-section == "center": VoiceWidget {
+                        label: root.voice-label;
+                        clicked => { root.voice-clicked(); }
+                    }
+                    if root.show-clock && root.clock-section == "center": ClockWidget {
+                        time-text: root.clock-text;
+                    }
+                    if root.show-volume-out && root.volume-out-section == "center": VolumeWidget {
+                        label: "󰕾";
+                        value-text: root.volume-out-text;
+                        muted: root.volume-out-muted;
+                    }
+                    if root.show-volume-in && root.volume-in-section == "center": VolumeWidget {
+                        label: "󰍬";
+                        value-text: root.volume-in-text;
+                        muted: root.volume-in-muted;
+                    }
+                }
+            }
+
+            // Right section
+            Rectangle {
+                horizontal-stretch: 1;
+                background: transparent;
+                HorizontalLayout {
+                    width: 100%;
+                    height: 100%;
+                    spacing: 4px;
+                    alignment: root.right-align == "center" ? center : (root.right-align == "start" ? start : end);
+                    if root.show-launcher && root.launcher-section == "right": LauncherWidget {
+                        label: root.launcher-label;
+                        clicked => { root.launcher-clicked(); }
+                    }
+                    if root.show-voice && root.voice-section == "right": VoiceWidget {
+                        label: root.voice-label;
+                        clicked => { root.voice-clicked(); }
+                    }
+                    if root.show-clock && root.clock-section == "right": ClockWidget {
+                        time-text: root.clock-text;
+                    }
+                    if root.show-volume-out && root.volume-out-section == "right": VolumeWidget {
+                        label: "󰕾";
+                        value-text: root.volume-out-text;
+                        muted: root.volume-out-muted;
+                    }
+                    if root.show-volume-in && root.volume-in-section == "right": VolumeWidget {
+                        label: "󰍬";
+                        value-text: root.volume-in-text;
+                        muted: root.volume-in-muted;
+                    }
+                }
+            }
+        }
+    }
+}

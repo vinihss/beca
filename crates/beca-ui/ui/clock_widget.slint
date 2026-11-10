@@ -1,0 +1,25 @@
+import { Theme } from "theme.slint";
+
+/// Simple clock widget for the bar.
+export component ClockWidget inherits Rectangle {
+    in property <string> time-text: "--:--";
+    in property <bool> show-seconds: false;
+
+    min-width: 64px;
+    min-height: 24px;
+    background: transparent;
+
+    HorizontalLayout {
+        alignment: center;
+        padding-left: 8px;
+        padding-right: 8px;
+        Text {
+            text: root.time-text;
+            color: Theme.text-main;
+            font-size: 13px;
+            font-weight: 600;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
+    }
+}

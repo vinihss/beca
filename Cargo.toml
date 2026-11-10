@@ -1,13 +1,10 @@
 [workspace]
 resolver = "3"
 members = [
-    "crates/ui-lib",
-    "crates/desktop-app",
-    "crates/voice-capture",
-    "crates/examples-runner",
+    "crates/beca",
     "crates/beca-core",
     "crates/beca-apps",
-    "crates/beca",
+    "crates/beca-ui",
 ]
 
 [workspace.package]
@@ -17,6 +14,7 @@ version = "0.1.0"
 [workspace.dependencies]
 slint = "1.18.1"
 slint-build = "1.18.1"
+slint-interpreter = "1.18.1"
 cpal = "0.15"
 clap = { version = "4", features = ["derive", "env"] }
 hound = "3.5"

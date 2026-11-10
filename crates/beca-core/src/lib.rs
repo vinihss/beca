@@ -1,15 +1,18 @@
-//! beca-core: config, theme, XDG paths, and load/merge logic.
-//! Precedence: CLI (applied by caller) > ENV > user config/theme files > defaults.
+//! beca-core: config, theme, XDG paths, runtime Lua.
 
-mod config;
-mod load;
-mod paths;
-mod theme;
+pub mod config;
+pub mod erro;
+pub mod lua;
+pub mod tema;
 
-pub use config::*;
-pub use load::*;
-pub use paths::*;
-pub use theme::*;
+// Re-exports for convenience (stable API)
+pub use config::{
+    BecaPaths, Config, CoreConfig, ModulesConfig, Resolved, ShellConfig, VoiceMode,
+    VoiceModuleConfig, VoiceUiConfig, apply_env, load, load_config, load_config_from,
+    load_with_paths,
+};
+pub use erro::BecaError;
+pub use tema::{Theme, ThemeColors, ThemeMeta, ThemeMetrics, load_theme, load_theme_from};
 
 #[cfg(test)]
 mod tests {

@@ -536,14 +536,13 @@ dependencies = [
  "anyhow",
  "beca-apps",
  "beca-core",
+ "beca-ui",
  "clap",
  "mlua",
  "serde",
  "serde_json",
  "slint",
- "slint-build",
- "ui-lib",
- "voice-capture",
+ "slint-interpreter",
 ]
 
 [[package]]
@@ -558,10 +557,33 @@ dependencies = [
 name = "beca-core"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "beca-apps",
+ "beca-ui",
  "dirs",
+ "mlua",
  "serde",
  "serde_json",
+ "slint",
+ "slint-interpreter",
  "toml 0.8.23",
+]
+
+[[package]]
+name = "beca-ui"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "cpal",
+ "hound",
+ "mlua",
+ "serde",
+ "serde_json",
+ "slint",
+ "slint-build",
+ "slint-interpreter",
+ "spin_on",
+ "ureq",
 ]
 
 [[package]]
@@ -1161,18 +1183,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "desktop-app"
-version = "0.1.0"
-dependencies = [
- "mlua",
- "serde_json",
- "slint",
- "slint-build",
- "ui-lib",
- "ureq",
-]
-
-[[package]]
 name = "dirs"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1384,16 +1394,6 @@ checksum = "8be9f3dfaaffdae2972880079a491a1a8bb7cbed0b8dd7a347f668b4150a3b93"
 dependencies = [
  "event-listener",
  "pin-project-lite",
-]
-
-[[package]]
-name = "examples-runner"
-version = "0.1.0"
-dependencies = [
- "mlua",
- "slint",
- "slint-build",
- "ui-lib",
 ]
 
 [[package]]
@@ -1999,6 +1999,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "i-slint-backend-qt"
+version = "1.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a32cd6edc5422d1525fbe4ed29635b642fdbb26ae7036abc20eee063faa45d4a"
+dependencies = [
+ "const-field-offset",
+ "i-slint-common",
+ "i-slint-core",
+ "i-slint-core-macros",
+ "vtable",
+]
+
+[[package]]
 name = "i-slint-backend-selector"
 version = "1.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2007,6 +2020,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "i-slint-backend-linuxkms",
+ "i-slint-backend-qt",
  "i-slint-backend-testing",
  "i-slint-backend-winit",
  "i-slint-common",
@@ -4524,6 +4538,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "slint-interpreter"
+version = "1.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "645cf39fcf871b5b49f7319973e8dee7af03ee51c5a2c8e1e7466d72acc8b217"
+dependencies = [
+ "derive_more",
+ "i-slint-backend-linuxkms",
+ "i-slint-backend-selector",
+ "i-slint-backend-winit",
+ "i-slint-common",
+ "i-slint-compiler",
+ "i-slint-core",
+ "i-slint-core-macros",
+ "itertools 0.15.0",
+ "lyon_path",
+ "smol_str 0.3.7",
+ "typed-index-collections",
+ "unicode-segmentation",
+ "vtable",
+ "web-sys",
+]
+
+[[package]]
 name = "slint-macros"
 version = "1.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5141,14 +5178,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ui-lib"
-version = "0.1.0"
-dependencies = [
- "slint",
- "slint-build",
-]
-
-[[package]]
 name = "unicase"
 version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5307,22 +5336,6 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
-
-[[package]]
-name = "voice-capture"
-version = "0.1.0"
-dependencies = [
- "beca-core",
- "clap",
- "cpal",
- "hound",
- "mlua",
- "serde",
- "serde_json",
- "slint",
- "ui-lib",
- "ureq",
-]
 
 [[package]]
 name = "vtable"

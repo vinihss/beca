@@ -7,7 +7,7 @@ local search = beca.ui.search_window({
 })
 
 search.on_search = function(text)
-    search:set_results(beca.apps.search(text))
+    search:set_results(beca.apps.search(text or ""))
 end
 
 search.on_select = function(name)
@@ -17,4 +17,6 @@ search.on_select = function(name)
     end
 end
 
+-- Populate initial results so the list is not empty on open.
+search:set_results(beca.apps.search(""))
 search:show()

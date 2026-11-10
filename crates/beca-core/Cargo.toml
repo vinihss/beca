@@ -8,3 +8,10 @@ serde.workspace = true
 serde_json.workspace = true
 toml.workspace = true
 dirs.workspace = true
+mlua.workspace = true
+slint.workspace = true
+slint-interpreter.workspace = true
+anyhow = "1"
+beca-apps = { path = "../beca-apps" }
+beca-ui = { path = "../beca-ui" }
+

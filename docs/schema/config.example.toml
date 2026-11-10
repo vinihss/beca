@@ -13,7 +13,7 @@ log_level = "info"
 # ex.: layer, anchor, exclusividade — definidos por módulo quando aplicável
 
 [modules.voice]
-# Módulo de captura/transcrição (componente ui-lib: VoiceCaptureWindow)
+# Módulo de captura/transcrição (componente beca-ui: VoiceCaptureWindow)
 enabled = true
 daemon_url = "http://127.0.0.1:4100"   # override: env VOICE_DAEMON_URL
 # comportamento padrão: "pipe" (stdout+exit, compat Hyprland binds) | "hold" (UI com resultado)
@@ -22,15 +22,49 @@ prefer_sample_rate = 16000
 channels = 1
 # script Lua de comportamento (opcional, override em disco; fallback embutido)
 # script = "scripts/voice.lua"          # relativo a $XDG_CONFIG_HOME/beca/
+# Responder com LLM e falar via TTS após transcrição (fluxo assistente/kokoro)
+respond = true
+# Comandos opcionais (shell): stdout = resposta; $TRANSCRIPT/$TEXT disponíveis
+# respond_command = "..."
+# tts_command = "..."
 
 [modules.voice.ui]
 # Overrides de UI/params sem recompilar (injetados como props)
 title = "Voice Capture"
 status_recording = "Gravando..."
 status_transcribing = "Transcrevendo áudio..."
+status_responding = "Pensando resposta..."
+status_speaking = "Falando resposta..."
 
-# Futuros módulos (multi-módulo)
 # [modules.launcher]
 # enabled = true
-# [modules.bar]
-# enabled = false
+
+[modules.bar]
+enabled = true
+# Formato do relógio (strftime), ex.: "%H:%M" ou "%H:%M:%S"
+clock_format = "%H:%M"
+show_clock = true
+show_launcher = true
+launcher_label = "Apps"
+height = 34.0
+# Reserva espaço (zona exclusiva/struts) para janelas não sobreporem a barra
+exclusive = true
+# Layout: 3 seções (left/center/right) com alinhamento e posição dos widgets
+clock_section = "center"      # left | center | right
+launcher_section = "left"     # left | center | right
+left_align = "start"          # start | center | end
+center_align = "center"       # start | center | end
+right_align = "end"          # start | center | end
+# Opacidade do fundo da barra (0.0 = transparente, 1.0 = opaco)
+background_opacity = 1.0
+# Exibir contorno/borda da barra
+show_border = false
+# Widgets de volume (PipeWire/wpctl ou PulseAudio/pactl)
+show_volume_out = true        # saída (sink)
+show_volume_in = true         # entrada (source/microfone)
+volume_out_section = "right"  # left | center | right
+volume_in_section = "right"   # left | center | right
+# Widget de voz (abre a janela de captura/transcrição)
+show_voice = true
+voice_label = "Voice"
+voice_section = "left"        # left | center | right

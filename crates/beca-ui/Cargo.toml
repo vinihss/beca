@@ -1,0 +1,27 @@
+[package]
+name = "beca-ui"
+edition.workspace = true
+version.workspace = true
+
+[lib]
+name = "beca_ui"
+path = "src/lib.rs"
+
+[[bin]]
+name = "beca-voice"
+path = "src/bin_voice.rs"
+
+[dependencies]
+slint.workspace = true
+slint-interpreter.workspace = true
+spin_on = "0.1"
+cpal.workspace = true
+clap.workspace = true
+hound.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ureq.workspace = true
+mlua.workspace = true
+
+[build-dependencies]
+slint-build.workspace = true
