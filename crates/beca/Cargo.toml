@@ -19,3 +19,6 @@ beca-core = { path = "../beca-core" }
 beca-apps = { path = "../beca-apps" }
 beca-ui = { path = "../beca-ui" }
 
+beca-layer-shell = { path = "../beca-layer-shell" }
+
+

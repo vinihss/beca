@@ -1,18 +1,15 @@
-//! beca-core: config, theme, XDG paths, runtime Lua.
-
 pub mod config;
-pub mod erro;
+pub mod error;
 pub mod lua;
-pub mod tema;
+pub mod theme;
 
-// Re-exports for convenience (stable API)
 pub use config::{
     BecaPaths, Config, CoreConfig, ModulesConfig, Resolved, ShellConfig, VoiceMode,
     VoiceModuleConfig, VoiceUiConfig, apply_env, load, load_config, load_config_from,
     load_with_paths,
 };
-pub use erro::BecaError;
-pub use tema::{Theme, ThemeColors, ThemeMeta, ThemeMetrics, load_theme, load_theme_from};
+pub use error::BecaError;
+pub use theme::{Theme, ThemeColors, ThemeMeta, ThemeMetrics, load_theme, load_theme_from};
 
 #[cfg(test)]
 mod tests {

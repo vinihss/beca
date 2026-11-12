@@ -1,20 +1,16 @@
 -- voice-sdk.luau
--- Exemplo: componente VoiceCaptureWindow via runtime unificado beca.*
--- Rode (GUI): cargo run -p beca -- run examples/voice_sdk.luau
+-- Example: VoiceCaptureWindow component via the unified beca.* runtime
+-- Run (GUI): cargo run -p beca -- run examples/voice_sdk.luau
 
-local daemon = (beca.voice.config().daemon_url) or "http://127.0.0.1:4100"
-local app = beca.ui.window("VoiceCaptureWindow")
-
--- Configurar props do componente (contrato da beca-ui)
-app:set("status-text", "Pronto para capturar")
+-- Configure component props (beca-ui contract)
 app:set("audio-path-data", "M 0 80 L 508 80")
 
--- Ações padrão (Rust) acessíveis via app:call
+-- Default actions (Rust) available via app:call
 app:on("send", function()
   print("[LUA] send clicked")
   app:call("ui.set", "busy", "true")
-  app:call("ui.set", "status-text", "Transcrevendo áudio...")
-  -- Exemplo com arquivo existente:
+  app:call("ui.set", "status-text", "Transcribing...")
+  -- Example with an existing file:
   -- local path = "/tmp/opencode/beca-voice-XXXX.wav"
   -- local text = app:call("transcribe.send", path, daemon)
   -- app:set("transcript-text", text)
@@ -42,10 +38,10 @@ app:on("close-app", function()
   app:call("app.close")
 end)
 
--- Também é possível usar beca.voice.transcribe diretamente (sem janela)
+-- You can also use beca.voice.transcribe directly (without a window)
 -- local t = beca.voice.transcribe("/tmp/opencode/test-voice.wav", daemon)
 -- print("[LUA] transcribe direct: " .. tostring(t))
 
-print("[LUA] script carregado. Chamando app:run()")
+print("[LUA] script loaded. Calling app:run()")
 app:run()
-print("[LUA] app:run() finalizado")
+print("[LUA] app:run() finished")

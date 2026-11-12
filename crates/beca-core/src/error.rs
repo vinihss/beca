@@ -1,6 +1,5 @@
 use std::fmt;
 
-/// Shared error type for beca-core.
 #[derive(Debug)]
 pub enum BecaError {
     Config(String),

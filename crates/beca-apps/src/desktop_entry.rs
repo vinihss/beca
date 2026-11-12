@@ -17,7 +17,6 @@ fn icon_cache() -> &'static Mutex<HashMap<String, Option<String>>> {
     ICON_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-/// Clear the resolved-icon cache (forces re-resolution on next lookup).
 pub fn clear_icon_cache() {
     if let Ok(mut cache) = icon_cache().lock() {
         cache.clear();
@@ -72,7 +71,6 @@ pub fn parse_desktop_file(path: &Path) -> Option<Application> {
     })
 }
 
-/// Resolve an Icon field value to a loadable image path (best-effort, cached).
 pub fn resolve_icon(icon: &str) -> Option<String> {
     let icon = icon.trim();
     if icon.is_empty() {
@@ -98,7 +96,7 @@ fn resolve_icon_uncached(icon: &str) -> Option<String> {
         }
         return None;
     }
-    // If it already has an extension and exists in pixmaps
+
     if p.extension().is_some() {
         for base in ["/usr/share/pixmaps", "/usr/local/share/pixmaps"] {
             let cand = Path::new(base).join(icon);
@@ -110,7 +108,7 @@ fn resolve_icon_uncached(icon: &str) -> Option<String> {
 
     let home = std::env::var_os("HOME").map(PathBuf::from);
     let exts = ["png", "svg", "xpm"];
-    // Common icon roots (hicolor + pixmaps + user)
+
     let mut roots: Vec<PathBuf> = vec![
         PathBuf::from("/usr/share/icons/hicolor"),
         PathBuf::from("/usr/share/icons/Adwaita"),
@@ -123,7 +121,6 @@ fn resolve_icon_uncached(icon: &str) -> Option<String> {
         roots.push(h.join(".local/share/icons"));
     }
 
-    // Prefer larger bitmap sizes and scalable
     let size_prefs = [
         "scalable/apps",
         "512x512/apps",
@@ -140,7 +137,7 @@ fn resolve_icon_uncached(icon: &str) -> Option<String> {
         if root.as_os_str().is_empty() {
             continue;
         }
-        // direct pixmaps dir
+
         if root.ends_with("pixmaps") {
             for ext in &exts {
                 let cand = root.join(format!("{icon}.{ext}"));
@@ -164,7 +161,7 @@ fn resolve_icon_uncached(icon: &str) -> Option<String> {
             }
         }
     }
-    // fallback: shallow recursive search in common roots for <name>.png/svg
+
     for root in &roots {
         if let Some(found) = find_icon_shallow(root, icon, 3) {
             return Some(found);

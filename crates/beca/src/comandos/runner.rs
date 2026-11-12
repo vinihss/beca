@@ -1,5 +1,3 @@
-//! Script runner (`beca run`).
-
 use anyhow::{Context, Result};
 use std::path::Path;
 
@@ -9,7 +7,7 @@ pub fn run_script(script: &str, args: &[String]) -> Result<()> {
         std::fs::read_to_string(path)
             .with_context(|| format!("failed to read script: {}", path.display()))?
     } else {
-        // try XDG scripts dir by name
+
         let paths = beca_core::config::BecaPaths::resolve();
         let name = if script.ends_with(".lua") || script.ends_with(".luau") {
             script.to_string()
@@ -29,7 +27,6 @@ pub fn run_script(script: &str, args: &[String]) -> Result<()> {
     let lua = mlua::Lua::new();
     beca_core::lua::bridge::install_beca_base(&lua).map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
-    // arg table (1-based, like Lua)
     let arg_tbl = lua
         .create_table()
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
@@ -45,7 +42,6 @@ pub fn run_script(script: &str, args: &[String]) -> Result<()> {
         .set("arg", arg_tbl)
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
-    // set module context for reload (best-effort name)
     if let Ok(beca) = lua.globals().get::<mlua::Table>("beca") {
         if let Ok(rt) = beca.get::<mlua::Table>("runtime") {
             let name = path

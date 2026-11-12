@@ -15,14 +15,13 @@ need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "missing: $1" >&2; exit 1
 build_bins() {
   need_cmd cargo
   echo "[beca-install] building release binaries..."
-  (cd "$ROOT" && cargo build --release -p beca -p beca-ui --bin beca --bin beca-voice)
+  (cd "$ROOT" && cargo build --release -p beca --bin beca)
 }
 
 install_bins() {
   mkdir -p "$BIN_DIR"
   install -m 0755 "$ROOT/target/release/beca" "$BIN_DIR/beca"
-  install -m 0755 "$ROOT/target/release/beca-voice" "$BIN_DIR/beca-voice"
-  echo "[beca-install] installed: $BIN_DIR/beca, $BIN_DIR/beca-voice"
+  echo "[beca-install] installed: $BIN_DIR/beca"
 }
 
 install_assets() {

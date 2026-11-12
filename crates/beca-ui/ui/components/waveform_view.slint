@@ -1,6 +1,6 @@
-import { Theme } from "theme.slint";
+import { Theme } from "../theme.slint";
+import { OscilloscopeView } from "oscilloscope_view.slint";
 
-/// Waveform display panel (renders an SVG path provided by backend).
 export component WaveformView inherits Rectangle {
     in property <string> audio-path-data: "M 0 80 L 508 80";
     in property <length> viewbox-width: 508px;
@@ -33,15 +33,11 @@ export component WaveformView inherits Rectangle {
         y: parent.height / 2;
     }
 
-    Path {
-        x: 0;
-        y: 0;
+    OscilloscopeView {
         width: 100%;
         height: 100%;
-        stroke: #7aa2f7;
-        stroke-width: 1.8px;
-        viewbox-width: root.viewbox-width / 1px;
-        viewbox-height: root.viewbox-height / 1px;
-        commands: root.audio-path-data;
+        audio-path-data: root.audio-path-data;
+        viewbox-width: root.viewbox-width;
+        viewbox-height: root.viewbox-height;
     }
 }

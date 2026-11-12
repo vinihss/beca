@@ -1,0 +1,75 @@
+import { Theme } from "../theme.slint";
+import { OscilloscopeView } from "../components/oscilloscope_view.slint";
+
+export component QuickVoiceWindow inherits Window {
+    width: 480px;
+    height: 150px;
+    background: transparent;
+    no-frame: true;
+    always-on-top: true;
+
+    callback send();
+    callback quit-quick();
+
+    in property <string> audio-path-data: "M 0 80 L 508 80";
+    in property <string> status-text: "Ready to record";
+    in property <brush> status-color: #7aa2f7;
+
+    in-out property <bool> reveal: false;
+
+    Rectangle {
+        x: 0;
+        width: root.width;
+        height: root.height;
+        background: transparent;
+        y: root.reveal ? 0px : -root.height;
+        animate y {
+            duration: 260ms;
+            easing: ease-out;
+        }
+
+        Rectangle {
+            x: 0;
+            y: 0;
+            width: 100%;
+            height: root.height - 12px;
+            background: #1a1b26ee;
+        }
+
+        Rectangle {
+            x: 0;
+            y: root.height - 24px;
+            width: 100%;
+            height: 24px;
+            border-radius: 14px;
+            background: #1a1b26ee;
+        }
+
+        VerticalLayout {
+            x: 0;
+            y: 0;
+            width: 100%;
+            height: 100%;
+            padding-left: 12px;
+            padding-right: 12px;
+            padding-top: 10px;
+            padding-bottom: 12px;
+            spacing: 6px;
+
+            OscilloscopeView {
+                vertical-stretch: 1;
+                audio-path-data: root.audio-path-data;
+                line-color: root.status-color;
+            }
+
+            Text {
+                text: root.status-text;
+                color: root.status-color;
+                font-size: 13px;
+                font-weight: 600;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

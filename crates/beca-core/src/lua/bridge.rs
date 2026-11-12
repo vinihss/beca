@@ -50,7 +50,7 @@ fn install_system(lua: &Lua, beca: &Table) -> mlua::Result<()> {
     system.set(
         "clipboard_copy",
         lua.create_function(|_, text: String| {
-            // try wl-copy, xclip, xsel
+
             for (cmd, args) in [
                 ("wl-copy", vec![]),
                 ("xclip", vec!["-selection", "clipboard"]),
@@ -480,7 +480,6 @@ fn install_hyprland(lua: &Lua, beca: &Table) -> mlua::Result<()> {
         })?,
     )?;
 
-    // convenience alias
     hypr.set(
         "exec",
         lua.create_function(|lua, command: String| {
@@ -493,8 +492,6 @@ fn install_hyprland(lua: &Lua, beca: &Table) -> mlua::Result<()> {
         })?,
     )?;
 
-    // Read events from .socket2.sock for up to timeout_ms (default 200).
-    // Returns array of { event = "...", data = "..." }.
     hypr.set(
         "read_events",
         lua.create_function(|lua, timeout_ms: Option<u64>| {
@@ -631,7 +628,7 @@ fn install_runtime(lua: &Lua, beca: &Table) -> mlua::Result<()> {
             };
             let embedded: String = runtime.get("_embedded").unwrap_or_default();
             let code = load_module_script(&name, &embedded);
-            // call on_unload hook if present
+
             if let Ok(hooks) = beca.get::<Table>("hooks") {
                 if let Ok(f) = hooks.get::<Function>("on_unload") {
                     let _ = f.call::<()>(());
@@ -652,12 +649,9 @@ fn install_runtime(lua: &Lua, beca: &Table) -> mlua::Result<()> {
     Ok(())
 }
 
-/// Install base `beca` table with domain namespaces and core capabilities.
-/// Domains: apps, ui, voice, events, system, hyprland.
 pub fn install_beca_base(lua: &Lua) -> mlua::Result<mlua::Table> {
     let beca = lua.create_table()?;
 
-    // Domain tables (extensible)
     let ui = lua.create_table()?;
     let apps = lua.create_table()?;
     let voice = lua.create_table()?;

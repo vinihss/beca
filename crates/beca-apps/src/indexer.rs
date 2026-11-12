@@ -17,7 +17,6 @@ fn apps_cache() -> &'static RwLock<Vec<Application>> {
     })
 }
 
-/// Reload the applications index from disk (invalidates in-memory cache).
 pub fn reload_index() {
     let mut apps = read_applications();
     apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
@@ -30,7 +29,7 @@ fn with_cached_applications<T>(f: impl FnOnce(&[Application]) -> T) -> T {
     if let Ok(cache) = apps_cache().read() {
         f(&cache)
     } else {
-        // poisoned; rebuild
+
         reload_index();
         if let Ok(cache) = apps_cache().read() {
             f(&cache)

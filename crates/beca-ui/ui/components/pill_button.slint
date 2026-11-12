@@ -1,7 +1,5 @@
-import { Theme } from "theme.slint";
+import { Theme } from "../theme.slint";
 
-/// Generic pill-shaped bar item (icon + optional label).
-/// Reused by the concrete bar widgets (launcher, voice, ...).
 export component PillButton inherits Rectangle {
     in property <string> icon;
     in property <string> label: "";
@@ -24,6 +22,7 @@ export component PillButton inherits Rectangle {
         Text {
             text: root.icon;
             color: root.icon-color;
+            font-family: Theme.icon-font-family;
             font-size: 14px;
             vertical-alignment: center;
         }

@@ -1,16 +1,11 @@
-import { Theme } from "theme.slint";
-import { ClockWidget } from "clock_widget.slint";
-import { LauncherWidget } from "launcher_widget.slint";
-import { VolumeWidget } from "volume_widget.slint";
-import { VoiceWidget } from "voice_widget.slint";
+import { Theme } from "../theme.slint";
+import { ClockWidget } from "./clock_widget.slint";
+import { LauncherWidget } from "./launcher_widget.slint";
+import { VolumeWidget } from "./volume_widget.slint";
+import { VoiceWidget } from "./voice_widget.slint";
 
-/// Bar window (top/bottom) divided into 3 sections: left, center, right.
-/// Each section has configurable alignment and can host widgets (clock/launcher/volume/voice).
-///
-/// The widget list is declared once and repeated over the section model, so adding a
-/// widget only requires editing a single block.
 export component BarWindow inherits Window {
-    in-out property <string> position: "top"; // "top" | "bottom"
+    in-out property <string> position: "top";
     in-out property <string> clock-text: "--:--";
     in-out property <bool> show-launcher: true;
     in-out property <bool> show-clock: true;
@@ -23,18 +18,18 @@ export component BarWindow inherits Window {
     in-out property <bool> volume-in-muted: false;
     in-out property <bool> show-voice: true;
     in-out property <string> voice-label: "Voice";
+
+    in-out property <bool> voice-recording: false;
     in-out property <bool> show-voice-assistant: true;
     in-out property <string> voice-assistant-label: "VA";
 
-    // Section placement: "left" | "center" | "right"
     in-out property <string> clock-section: "center";
     in-out property <string> launcher-section: "left";
     in-out property <string> volume-out-section: "right";
     in-out property <string> volume-in-section: "right";
-    in-out property <string> voice-section: "left";
+    in-out property <string> voice-section: "center";
     in-out property <string> voice-assistant-section: "left";
 
-    // Section alignment: "start" | "center" | "end"
     in-out property <string> left-align: "start";
     in-out property <string> center-align: "center";
     in-out property <string> right-align: "end";
@@ -44,7 +39,6 @@ export component BarWindow inherits Window {
     callback voice-clicked();
     callback voice-assistant-clicked();
 
-    // Internal section model: one column per slot, laid out once below.
     property <[string]> section-names: ["left", "center", "right"];
     property <LayoutAlignment> left-align-value:
         root.left-align == "start" ? start : (root.left-align == "end" ? end : center);
@@ -56,7 +50,7 @@ export component BarWindow inherits Window {
     title: "beca-bar";
     no-frame: true;
     background: transparent;
-    // default size; runtime may override/position (layer-shell in future)
+
     preferred-width: 800px;
     min-width: 320px;
     height: 34px;
@@ -88,16 +82,17 @@ export component BarWindow inherits Window {
                         label: root.launcher-label;
                         clicked => { root.launcher-clicked(); }
                     }
-                    if root.show-voice && root.voice-section == section : VoiceWidget {
-                        label: root.voice-label;
-                        clicked => { root.voice-clicked(); }
-                    }
                     if root.show-voice-assistant && root.voice-assistant-section == section : VoiceWidget {
                         label: root.voice-assistant-label;
                         clicked => { root.voice-assistant-clicked(); }
                     }
                     if root.show-clock && root.clock-section == section : ClockWidget {
                         time-text: root.clock-text;
+                    }
+                    if root.show-voice && root.voice-section == section : VoiceWidget {
+                        label: root.voice-label;
+                        icon-color: root.voice-recording ? #f7768e : Theme.accent;
+                        clicked => { root.voice-clicked(); }
                     }
                     if root.show-volume-out && root.volume-out-section == section : VolumeWidget {
                         label: "󰕾";

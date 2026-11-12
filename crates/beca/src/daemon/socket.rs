@@ -10,11 +10,11 @@ use std::thread;
 
 #[derive(Default)]
 struct DaemonState {
-    /// tracked bar surfaces: key "top"/"bottom" -> pid
+
     bars: HashMap<String, u32>,
-    /// resident launcher pid (serves show/hide via control socket)
+
     launcher_pid: Option<u32>,
-    /// resident voice pid (serves show via control socket)
+
     voice_pid: Option<u32>,
 }
 
@@ -27,9 +27,9 @@ fn is_pid_alive(pid: u32) -> bool {
     if pid == 0 {
         return false;
     }
-    // kill -0 returns success for zombie processes too; treat zombies as not alive.
+
     if let Ok(stat) = std::fs::read_to_string(format!("/proc/{pid}/stat")) {
-        // format: pid (comm) state ...
+
         if let Some(end) = stat.rfind(')') {
             let rest = stat[end + 1..].trim_start();
             if let Some(state) = rest.chars().next() {
@@ -48,7 +48,6 @@ fn is_pid_alive(pid: u32) -> bool {
         .unwrap_or(false)
 }
 
-/// Best-effort: clear exclusive zone (reserved space) for a bar position on all monitors.
 fn clear_bar_reserved(position: &str) {
     let monitors_out = Command::new("hyprctl")
         .args(["monitors", "-j"])
@@ -64,7 +63,7 @@ fn clear_bar_reserved(position: &str) {
         let Some(name) = m.get("name").and_then(|v| v.as_str()) else {
             continue;
         };
-        // reserved array observed: [left, top, right, bottom]
+
         let reserved = m.get("reserved").and_then(|v| v.as_array());
         let l = reserved
             .and_then(|a| a.get(0))
@@ -119,7 +118,6 @@ pub fn run() -> Result<()> {
         .with_context(|| format!("failed to bind daemon socket {}", path.display()))?;
     eprintln!("[beca daemon] listening on {}", path.display());
 
-    // Pre-warm resident launcher and voice in background so first show is instant.
     thread::spawn(|| {
         std::thread::sleep(std::time::Duration::from_millis(150));
         match ensure_resident_launcher() {
@@ -152,7 +150,6 @@ fn handle_client(stream: UnixStream) -> Result<()> {
     let mut writer = stream;
     let mut line = String::new();
 
-    // read first request
     if reader.read_line(&mut line)? == 0 {
         return Ok(());
     }
@@ -167,7 +164,6 @@ fn handle_client(stream: UnixStream) -> Result<()> {
 
     let req_type = req.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
-    // Long-lived streaming modes
     if req_type == "hyprland.subscribe" {
         let ack = json!({"ok": true, "type": "subscribed"});
         writeln!(writer, "{}", ack)?;
@@ -175,12 +171,10 @@ fn handle_client(stream: UnixStream) -> Result<()> {
         return stream_hyprland_events(writer);
     }
 
-    // Normal request-response
     let resp = handle_request(&req);
     writeln!(writer, "{}", resp)?;
     writer.flush()?;
 
-    // Keep connection open for additional requests (simple session)
     line.clear();
     while reader.read_line(&mut line)? > 0 {
         let req: Value = match serde_json::from_str(line.trim()) {
@@ -250,16 +244,14 @@ fn handle_request(req: &Value) -> Value {
 }
 
 fn handle_config_reload() -> Value {
-    // Invalidate in-process caches so restarted modules pick up fresh data/UI.
+
     beca_ui::ui_loader::invalidate_cache();
     beca_apps::reload_index();
     beca_apps::clear_icon_cache();
 
-    // Force reload: restart managed UI modules so they re-read config/theme from disk.
     let mut restarted_bars: Vec<String> = Vec::new();
     let mut bar_errors: Vec<String> = Vec::new();
 
-    // Collect running bar positions.
     let positions: Vec<String> = {
         let mut st = state().lock().unwrap();
         let keys: Vec<String> = st.bars.keys().cloned().collect();
@@ -275,14 +267,13 @@ fn handle_config_reload() -> Value {
         }
         running
     };
-    // Clear exclusive zones (best-effort).
+
     for pos in ["top", "bottom"] {
         clear_bar_reserved(pos);
     }
-    // Give processes a moment to exit and release state.
+
     std::thread::sleep(std::time::Duration::from_millis(200));
 
-    // Respawn previously running bars.
     for pos in positions {
         let spawn_target = match pos.as_str() {
             "bottom" => "bar:show-bottom",
@@ -298,7 +289,6 @@ fn handle_config_reload() -> Value {
         }
     }
 
-    // Restart resident launcher if running, so it re-reads config/theme.
     let mut launcher_restarted = false;
     let launcher_was_running = {
         let mut st = state().lock().unwrap();
@@ -310,18 +300,17 @@ fn handle_config_reload() -> Value {
         let _ = send_launcher_control("quit");
         let _ = std::fs::remove_file(launcher_ctl_path());
         std::thread::sleep(std::time::Duration::from_millis(200));
-        // Re-spawn resident launcher and keep it hidden/ready.
+
         match ensure_resident_launcher() {
             Ok(_) => {
                 launcher_restarted = true;
             }
             Err(_) => {
-                // not fatal; next show will start it
+
             }
         }
     }
 
-    // Restart resident voice if running (picks up config/theme and warm cache).
     let mut voice_restarted = false;
     let voice_was_running = {
         let mut st = state().lock().unwrap();
@@ -338,7 +327,7 @@ fn handle_config_reload() -> Value {
                 voice_restarted = true;
             }
             Err(_) => {
-                // not fatal; next show will start it
+
             }
         }
     }
@@ -460,17 +449,17 @@ fn ensure_resident_launcher() -> Result<u32, String> {
             st.launcher_pid = None;
         }
     }
-    // maybe running but untracked
+
     if launcher_ctl_alive() {
         return Ok(0);
     }
     let _ = std::fs::remove_file(launcher_ctl_path());
     let pid = spawn_local_mod("launcher:serve", &[])?;
-    // wait for control socket
+
     let ctl = launcher_ctl_path();
     for _ in 0..100 {
         if ctl.exists() && send_launcher_control("show").is_ok() {
-            // it responded to show probe? no, don't send show here - just check connect
+
         }
         if ctl.exists() {
             if UnixStream::connect(&ctl).is_ok() {
@@ -479,7 +468,7 @@ fn ensure_resident_launcher() -> Result<u32, String> {
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
-    // final readiness check
+
     if UnixStream::connect(&ctl).is_err() {
         return Err("resident launcher started but control socket not ready".to_string());
     }
@@ -545,13 +534,13 @@ fn ensure_resident_voice() -> Result<u32, String> {
             st.voice_pid = None;
         }
     }
-    // maybe running but untracked
+
     if voice_ctl_alive() {
         return Ok(0);
     }
     let _ = std::fs::remove_file(voice_ctl_path());
     let pid = spawn_local_mod("voice:serve", &[])?;
-    // wait for control socket
+
     let ctl = voice_ctl_path();
     for _ in 0..100 {
         if ctl.exists() {
@@ -584,7 +573,6 @@ fn handle_mod_request(req: &Value) -> Value {
         })
         .unwrap_or_default();
 
-    // voice:transcribe is safe to run in-process in daemon (no UI)
     if target == "voice:transcribe" {
         return match crate::comandos::voice::dispatch("transcribe", &args) {
             Ok(_) => json!({"ok": true, "target": target, "mode": "in-process"}),
@@ -592,7 +580,6 @@ fn handle_mod_request(req: &Value) -> Value {
         };
     }
 
-    // Voice lifecycle (resident, instant show / warm process)
     if target.starts_with("voice:") {
         match target.as_str() {
             "voice:status" => {
@@ -649,11 +636,10 @@ fn handle_mod_request(req: &Value) -> Value {
                     Err(e) => json!({"ok": false, "error": e, "target": target}),
                 };
             }
-            _ => {} // fall through to spawn (transcribe handled above, other actions not resident)
+            _ => {}
         }
     }
 
-    // Launcher lifecycle (resident, instant show)
     if target.starts_with("launcher:") {
         match target.as_str() {
             "launcher:status" => {
@@ -684,7 +670,7 @@ fn handle_mod_request(req: &Value) -> Value {
                 };
             }
             "launcher:serve" => {
-                // explicit serve spawn (tracked)
+
                 let mut st = state().lock().unwrap();
                 if let Some(pid) = st.launcher_pid {
                     if is_pid_alive(pid) {
@@ -702,14 +688,13 @@ fn handle_mod_request(req: &Value) -> Value {
                     Err(e) => json!({"ok": false, "error": e, "target": target}),
                 };
             }
-            _ => {} // fall through to generic spawn
+            _ => {}
         }
     }
 
-    // Bar lifecycle management (single instance per position)
     if target.starts_with("bar:") {
         if target == "bar:status" {
-            // report tracked bars
+
             let mut st = state().lock().unwrap();
             let mut bars = serde_json::Map::new();
             let keys: Vec<String> = st.bars.keys().cloned().collect();
@@ -734,12 +719,12 @@ fn handle_mod_request(req: &Value) -> Value {
                         let _ = Command::new("kill").arg(pid.to_string()).status();
                     }
                     drop(st);
-                    // best-effort: clear exclusive zone (reserved space) for this bar position
+
                     clear_bar_reserved(&pos);
                     return json!({"ok": true, "target": target, "position": pos, "stopped": true, "pid": pid});
                 } else {
                     drop(st);
-                    // ensure reserved is cleared even if we lost tracking
+
                     clear_bar_reserved(&pos);
                     return json!({"ok": true, "target": target, "position": pos, "stopped": false, "note": "not running"});
                 }
@@ -756,7 +741,7 @@ fn handle_mod_request(req: &Value) -> Value {
                         st.bars.remove(&pos);
                     }
                 }
-                // normalize spawn target to explicit position action
+
                 let spawn_target = match pos.as_str() {
                     "bottom" => "bar:show-bottom",
                     _ => "bar:show-top",
@@ -772,14 +757,12 @@ fn handle_mod_request(req: &Value) -> Value {
         }
     }
 
-    // For UI/interactive modules, spawn a local beca process (daemon routes lifecycle)
     match spawn_local_mod(&target, &args) {
         Ok(pid) => json!({"ok": true, "target": target, "mode": "spawned", "pid": pid}),
         Err(e) => json!({"ok": false, "error": e, "target": target}),
     }
 }
 
-/// Send a request to a running daemon and return the response.
 pub fn send_request(req: &Value) -> Result<Value> {
     let path = socket_path();
     let mut stream = UnixStream::connect(&path)
@@ -793,7 +776,6 @@ pub fn send_request(req: &Value) -> Result<Value> {
     Ok(resp)
 }
 
-/// Try to send a mod request to daemon; returns Some(response) if daemon handled/routed it.
 pub fn try_route_mod(target: &str, args: &[String]) -> Option<Value> {
     let path = socket_path();
     if !path.exists() {

@@ -5,6 +5,7 @@ members = [
     "crates/beca-core",
     "crates/beca-apps",
     "crates/beca-ui",
+    "crates/beca-layer-shell",
 ]
 
 [workspace.package]
@@ -26,5 +27,12 @@ ureq = "2"
 mlua = { version = "0.10", features = ["lua54", "vendored"] }
 
 [profile.release]
-codegen-units = 1
-lto = true
+# Dev-fast release: much quicker to build; thin LTO keeps most of the perf.
+# For final packaging (e.g. install): 
+#   cargo build --release --config profile.release.lto=full --config profile.release.codegen-units=1
+codegen-units = 16
+lto = "thin"
+
+[profile.dev]
+# Keep Slint interactive without full optimization; much faster compiles than release.
+opt-level = 1

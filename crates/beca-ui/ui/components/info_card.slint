@@ -1,7 +1,6 @@
 import { VerticalBox } from "std-widgets.slint";
-import { Theme } from "theme.slint";
+import { Theme } from "../theme.slint";
 
-/// Informational card container (guide-compatible API + optional @children).
 export component InfoCard inherits Rectangle {
     in property <string> title;
     in property <length> border-size: 1px;

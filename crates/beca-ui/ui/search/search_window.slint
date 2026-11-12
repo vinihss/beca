@@ -1,12 +1,11 @@
 import { LineEdit, Button, ScrollView } from "std-widgets.slint";
-import { Theme } from "theme.slint";
+import { Theme } from "../theme.slint";
 
 export struct AppEntry {
     name: string,
     icon: image,
 }
 
-/// Search/launcher window (module: launcher/apps).
 export component SearchWindow inherits Window {
     title: "beca";
     width: 640px;

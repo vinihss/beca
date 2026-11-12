@@ -1,5 +1,5 @@
--- beca launcher (módulo launcher)
--- Uso: beca mod launcher:show (comportamento embutido) ou via runtime de scripts
+-- beca launcher (launcher module)
+-- Usage: beca mod launcher:show (embedded behavior) or via the script runtime
 
 local search = beca.ui.search_window({
     title = "beca launcher",

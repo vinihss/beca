@@ -5,6 +5,83 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+fn run_voice_layer_shell_show(action: &str, args: &[String]) -> Result<()> {
+    let force_window = std::env::var_os("BECA_VOICE_FORCE_WINDOW").is_some();
+    #[cfg(target_os = "linux")]
+    if !force_window && std::env::var_os("WAYLAND_DISPLAY").is_some() {
+        use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+        use std::{collections::VecDeque, rc::Rc, sync::Mutex};
+
+        if std::env::var_os("BECA_VOICE_COMPONENT").is_none() {
+            let name = if action.starts_with("assistant") {
+                "VoiceAssistantWindow"
+            } else {
+                "VoiceCaptureWindow"
+            };
+            unsafe { std::env::set_var("BECA_VOICE_COMPONENT", name) };
+        }
+
+        let queue = Arc::new(Mutex::new(VecDeque::<Rc<MinimalSoftwareWindow>>::new()));
+        beca_layer_shell::install_platform(queue.clone());
+        let msw = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        queue.lock().unwrap().push_back(msw.clone());
+
+        beca_ui::ui_loader::set_custom_event_loop(move || {
+            beca_layer_shell::run_voice_layer_shell(msw.clone())
+        });
+
+        unsafe { std::env::set_var("BECA_VOICE_LAYER_SHELL", "1") };
+        let r = run_voice_session(args);
+        unsafe { std::env::remove_var("BECA_VOICE_LAYER_SHELL") };
+
+        return match r {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                let msg = format!("{e:#}");
+                let fatal = msg.contains("flush")
+                    || msg.contains("roundtrip")
+                    || msg.contains("wayland connect")
+                    || msg.contains("registry")
+                    || msg.contains("wlr-layer-shell")
+                    || msg.contains("wl_shm");
+                eprintln!("[voice] layer-shell session failed: {msg}");
+                if fatal {
+                    if let Ok(exe) = std::env::current_exe() {
+                        let target = format!("voice:{action}");
+                        let mut cmd = std::process::Command::new(exe);
+                        cmd.arg("mod").arg("--local").arg(target);
+                        for a in args {
+                            cmd.arg(a);
+                        }
+                        cmd.env("BECA_VOICE_FORCE_WINDOW", "1")
+                            .env("BECA_NO_DAEMON", "1");
+                        let status = cmd.status();
+                        match status {
+                            Ok(s) if s.success() => return Ok(()),
+                            Ok(s) => {
+                                anyhow::bail!("voice layer-shell fallback process exited with status {s}")
+                            }
+                            Err(err) => {
+                                anyhow::bail!("failed to spawn voice layer-shell fallback: {err}")
+                            }
+                        }
+                    }
+                    anyhow::bail!("could not resolve current executable for fallback");
+                }
+                Err(e)
+            }
+        };
+    }
+
+    let component_name = if action.starts_with("assistant") {
+        "VoiceAssistantWindow"
+    } else {
+        "VoiceCaptureWindow"
+    };
+    unsafe { std::env::set_var("BECA_VOICE_COMPONENT", component_name) };
+    run_voice_session(args)
+}
+
 fn ui_texts_from_config(ui: &beca_core::config::VoiceUiConfig) -> beca_ui::voice::VoiceUiTexts {
     let opt = |s: &str| -> Option<String> {
         if s.trim().is_empty() {
@@ -33,15 +110,18 @@ fn voice_ctl_path() -> PathBuf {
 
 fn run_voice_session(args: &[String]) -> Result<()> {
     let t0 = std::time::Instant::now();
-    // Reload config/theme each session; UI compile cache auto-invalidates on file changes.
+
     let resolved = beca_core::config::load();
-    eprintln!("[beca-voice][timing] config+theme loaded in {:?}", t0.elapsed());
+    eprintln!("[voice][timing] config+theme loaded in {:?}", t0.elapsed());
     let voice = &resolved.config.modules.voice;
     let theme = resolved.theme.voice_theme();
     let ui_texts = ui_texts_from_config(&voice.ui);
     let respond_cfg = beca_ui::voice::RespondConfig {
         respond_command: voice.respond_command.clone(),
         tts_command: voice.tts_command.clone(),
+        respond_stream: voice.respond_stream,
+        llm_url: voice.llm_url.clone(),
+        llm_model: voice.llm_model.clone(),
     };
 
     let mut hold = voice.mode == beca_core::config::VoiceMode::Hold;
@@ -92,8 +172,105 @@ fn run_voice_session(args: &[String]) -> Result<()> {
     .map_err(|e| anyhow::anyhow!(e))
 }
 
-/// Resident voice service: listens for `show` on ctl socket and runs capture sessions.
-/// Keeps process warm and reuses compiled UI definitions across sessions.
+fn run_quick_session(args: &[String]) -> Result<()> {
+    let resolved = beca_core::config::load();
+    let voice = &resolved.config.modules.voice;
+    let theme = resolved.theme.voice_theme();
+    let ui_texts = ui_texts_from_config(&voice.ui);
+    let respond_cfg = beca_ui::voice::RespondConfig {
+        respond_command: voice.respond_command.clone(),
+        tts_command: voice.tts_command.clone(),
+        respond_stream: voice.respond_stream,
+        llm_url: voice.llm_url.clone(),
+        llm_model: voice.llm_model.clone(),
+    };
+    let mut respond = voice.respond;
+    let mut out: Option<PathBuf> = None;
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--no-respond" | "--no-tts" => respond = false,
+            "--respond" | "--assist" | "--tts" => respond = true,
+            "-o" | "--output" => {
+                if let Some(v) = it.next() {
+                    out = Some(PathBuf::from(v));
+                }
+            }
+            _ => {}
+        }
+    }
+    let out_path = out.unwrap_or_else(beca_ui::voice::default_output_path);
+    beca_ui::voice::quick::run_quick(
+        &out_path,
+        &voice.daemon_url,
+        respond,
+        respond_cfg,
+        theme,
+        ui_texts,
+    )
+    .map_err(|e| anyhow::anyhow!(e))
+}
+
+fn run_voice_quick(args: &[String]) -> Result<()> {
+    let force_window = std::env::var_os("BECA_QUICK_FORCE_WINDOW").is_some();
+    #[cfg(target_os = "linux")]
+    if !force_window && std::env::var_os("WAYLAND_DISPLAY").is_some() {
+        use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+        use std::{collections::VecDeque, rc::Rc, sync::Mutex};
+
+        let queue = Arc::new(Mutex::new(VecDeque::<Rc<MinimalSoftwareWindow>>::new()));
+        beca_layer_shell::install_platform(queue.clone());
+        let msw = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        queue.lock().unwrap().push_back(msw.clone());
+
+        beca_ui::ui_loader::set_custom_event_loop(move || {
+            beca_layer_shell::run_quick_layer_shell(msw.clone())
+        });
+        unsafe { std::env::set_var("BECA_VOICE_LAYER_SHELL", "1") };
+        let r = run_quick_session(args);
+        unsafe { std::env::remove_var("BECA_VOICE_LAYER_SHELL") };
+
+        return match r {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                let msg = format!("{e:#}");
+                let fatal = msg.contains("flush")
+                    || msg.contains("roundtrip")
+                    || msg.contains("wayland connect")
+                    || msg.contains("registry")
+                    || msg.contains("wlr-layer-shell")
+                    || msg.contains("wl_shm");
+                eprintln!("[beca-quick] layer-shell session failed: {msg}");
+                if fatal {
+                    if let Ok(exe) = std::env::current_exe() {
+                        let mut cmd = std::process::Command::new(exe);
+                        cmd.arg("mod").arg("--local").arg("voice:quick");
+                        for a in args {
+                            cmd.arg(a);
+                        }
+                        cmd.env("BECA_QUICK_FORCE_WINDOW", "1")
+                            .env("BECA_NO_DAEMON", "1");
+                        let status = cmd.status();
+                        match status {
+                            Ok(s) if s.success() => return Ok(()),
+                            Ok(s) => {
+                                anyhow::bail!("quick layer-shell fallback process exited with status {s}")
+                            }
+                            Err(err) => {
+                                anyhow::bail!("failed to spawn quick fallback: {err}")
+                            }
+                        }
+                    }
+                    anyhow::bail!("could not resolve current executable for fallback");
+                }
+                Err(e)
+            }
+        };
+    }
+
+    run_quick_session(args)
+}
+
 pub fn serve() -> Result<()> {
     let path = voice_ctl_path();
     if let Some(parent) = path.parent() {
@@ -104,11 +281,9 @@ pub fn serve() -> Result<()> {
         .map_err(|e| anyhow::anyhow!("failed to bind voice ctl socket {}: {e}", path.display()))?;
     eprintln!("[beca voice] serving on {}", path.display());
 
-    // Local cache of compiled UI defs (avoids recompilation across sessions).
     let mut ui_defs: std::collections::HashMap<String, slint_interpreter::ComponentDefinition> =
         std::collections::HashMap::new();
 
-    // Pre-warm default voice UI.
     let t_warm = std::time::Instant::now();
     match beca_ui::ui_loader::compile_component("VoiceCaptureWindow") {
         Ok(def) => {
@@ -162,7 +337,6 @@ pub fn serve() -> Result<()> {
                 let _ = writeln!(writer, "{resp}");
                 let _ = writer.flush();
 
-                // Ensure compiled def is available and pinned for this session.
                 if !ui_defs.contains_key(component) {
                     match beca_ui::ui_loader::compile_component(component) {
                         Ok(def) => { ui_defs.insert(component.to_string(), def); }
@@ -194,18 +368,18 @@ pub fn serve() -> Result<()> {
     Ok(())
 }
 
-/// `beca mod voice:show` / `voice:transcribe` / `voice:serve`
 pub fn dispatch(action: &str, args: &[String]) -> Result<()> {
     match action {
         "serve" => serve(),
-        "show" => run_voice_session(args),
+        "show" => run_voice_layer_shell_show("show", args),
         "assistant" | "show-assistant" => {
-            // Safety: best-effort, single-use in CLI dispatch path.
+
             unsafe { std::env::set_var("BECA_VOICE_COMPONENT", "VoiceAssistantWindow") };
-            let r = run_voice_session(args);
+            let r = run_voice_layer_shell_show(action, args);
             unsafe { std::env::remove_var("BECA_VOICE_COMPONENT") };
             r
         }
+        "quick" => run_voice_quick(args),
         "transcribe" => {
             let resolved = beca_core::config::load();
             let voice = &resolved.config.modules.voice;
@@ -214,6 +388,9 @@ pub fn dispatch(action: &str, args: &[String]) -> Result<()> {
             let respond_cfg = beca_ui::voice::RespondConfig {
                 respond_command: voice.respond_command.clone(),
                 tts_command: voice.tts_command.clone(),
+                respond_stream: voice.respond_stream,
+                llm_url: voice.llm_url.clone(),
+                llm_model: voice.llm_model.clone(),
             };
             let mut input: Option<PathBuf> = None;
             let mut it = args.iter();

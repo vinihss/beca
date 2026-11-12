@@ -86,10 +86,7 @@ impl Default for ThemeMetrics {
 }
 
 impl Theme {
-    /// Map the config theme onto the UI-facing carrier used by `beca_ui`.
-    ///
-    /// This is the only config → UI conversion in the workspace; callers should
-    /// never rebuild the mapping by hand.
+
     pub fn voice_theme(&self) -> beca_ui::voice::VoiceTheme {
         beca_ui::voice::VoiceTheme {
             background: self.colors.background.clone(),

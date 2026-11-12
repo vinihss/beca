@@ -1,0 +1,15 @@
+[package]
+name = "beca-layer-shell"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+beca-ui = { path = "../beca-ui" }
+beca-core = { path = "../beca-core" }
+slint = { workspace = true, features = ["compat-1-2", "renderer-software"] }
+smithay-client-toolkit = { version = "0.18", default-features = false, features = ["calloop", "xkbcommon"] }
+wayland-client = "0.31"
+calloop = "0.13"
+serde_json = { workspace = true }
+xkeysym = "0.2"
+

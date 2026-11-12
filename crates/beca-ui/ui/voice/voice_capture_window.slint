@@ -1,9 +1,9 @@
-import { HorizontalBox, VerticalBox, ScrollView } from "std-widgets.slint";
-import { Theme } from "theme.slint";
-import { InfoCard } from "info_card.slint";
-import { MediaButton } from "media_button.slint";
-import { WaveformView } from "waveform_view.slint";
-import { StatusHeader, SettingsPanel, CaptureControls, ResultActions } from "voice_common.slint";
+import { VerticalBox, ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { InfoCard } from "../components/info_card.slint";
+import { MediaButton } from "../components/media_button.slint";
+import { WaveformView } from "../components/waveform_view.slint";
+import { StatusHeader, SettingsPanel, CaptureControls, ResultActions } from "./voice_common.slint";
 
 export component VoiceCaptureWindow inherits Window {
     title: "Voice Capture";
@@ -12,9 +12,8 @@ export component VoiceCaptureWindow inherits Window {
     background: transparent;
     default-font-family: "Sans";
 
-    // ---- State (driven by Rust / behavior scripts) ----
     in property <string> audio-path-data: "M 0 80 L 508 80";
-    in property <string> status-text: "Pronto para gravar";
+    in property <string> status-text: "Ready to record";
     in property <brush> status-color: Theme.accent;
     in property <bool> busy: false;
     in property <bool> is-recording: false;
@@ -24,11 +23,10 @@ export component VoiceCaptureWindow inherits Window {
     in-out property <bool> show-settings: false;
     in-out property <bool> respond-enabled: true;
     in-out property <bool> hold-enabled: false;
-    // Accordion opening animation (used by the capture window).
+
     in-out property <bool> reveal: false;
     in property <bool> reveal-enabled: true;
 
-    // ---- Callbacks (handled by Rust) ----
     callback send();
     callback cancel();
     callback copy-text();
@@ -45,7 +43,6 @@ export component VoiceCaptureWindow inherits Window {
         border-radius: 16px;
         clip: true;
 
-        // Reveal container: animates height when `reveal-enabled` is true.
         Rectangle {
             x: 0;
             y: 0;
@@ -85,7 +82,6 @@ export component VoiceCaptureWindow inherits Window {
                     }
                 }
 
-                // ===== Capture screen (not showing a result) =====
                 if !root.show-result : VerticalBox {
                     spacing: 14px;
 
@@ -96,7 +92,7 @@ export component VoiceCaptureWindow inherits Window {
 
                     if root.response-text != "" : InfoCard {
                         border-size: 0px;
-                        title: "Resposta";
+                        title: "Response";
                         min-height: 90px;
                         ScrollView {
                             width: 100%;
@@ -121,13 +117,12 @@ export component VoiceCaptureWindow inherits Window {
                     }
                 }
 
-                // ===== Result screen (transcript) =====
                 if root.show-result : VerticalBox {
                     spacing: 12px;
 
                     InfoCard {
                         border-size: 0px;
-                        title: "Transcrição";
+                        title: "Transcript";
                         min-height: 140px;
                         ScrollView {
                             width: 100%;

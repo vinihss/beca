@@ -53,7 +53,7 @@ pub fn transcribe(base_url: &str, audio_path: &Path) -> Result<String, String> {
         return Err("empty audio file".to_string());
     }
     let url = format!("{}/transcribe", base_url.trim_end_matches('/'));
-    eprintln!("[beca-voice] transcrevendo...");
+    eprintln!("[voice] transcribing...");
     let resp = ureq::post(&url)
         .set("Content-Type", "audio/wav")
         .send(Cursor::new(bytes))
@@ -71,7 +71,7 @@ pub fn transcribe(base_url: &str, audio_path: &Path) -> Result<String, String> {
         .to_string();
     if text.is_empty() {
         return Err(
-            "transcrição vazia (áudio silencioso/curto). Fale mais alto ou mais longo.".to_string(),
+            "empty transcript (silent or too-short audio). Speak louder or longer.".to_string(),
         );
     }
     Ok(text)
@@ -80,7 +80,7 @@ pub fn transcribe(base_url: &str, audio_path: &Path) -> Result<String, String> {
 pub fn handle_transcript(text: &str, run: Option<&str>, cleanup_path: Option<&Path>) {
     if text.is_empty() {
         eprintln!("ERROR: empty transcript");
-        notify("⚠️ Transcrição vazia");
+        notify("⚠️ Empty transcript");
         if let Some(p) = cleanup_path {
             let _ = fs::remove_file(p);
         }

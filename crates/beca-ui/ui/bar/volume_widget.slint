@@ -1,6 +1,5 @@
-import { Theme } from "theme.slint";
+import { Theme } from "../theme.slint";
 
-/// Volume widget for the bar (output/input).
 export component VolumeWidget inherits Rectangle {
     in property <string> label: "󰕾";
     in property <string> value-text: "--%";
@@ -18,6 +17,7 @@ export component VolumeWidget inherits Rectangle {
         Text {
             text: root.muted ? "󰝟" : root.label;
             color: root.muted ? Theme.accent-danger : Theme.accent;
+            font-family: Theme.icon-font-family;
             font-size: 13px;
             vertical-alignment: center;
         }

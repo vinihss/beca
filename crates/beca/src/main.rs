@@ -13,12 +13,12 @@ fn main() -> Result<()> {
             local,
             args,
         } => {
-            // Route via daemon when available (except voice:transcribe which must preserve pipe/stdout contract)
+
             let no_daemon = local || std::env::var_os("BECA_NO_DAEMON").is_some();
             if !no_daemon && target != "voice:transcribe" {
                 if let Some(resp) = daemon::try_route_mod(&target, &args) {
                     if resp.get("ok").and_then(|v| v.as_bool()) == Some(true) {
-                        // print daemon response for observability (spawn/status/lifecycle)
+
                         println!("{}", serde_json::to_string(&resp)?);
                         return Ok(());
                     } else {

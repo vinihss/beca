@@ -1,70 +1,70 @@
-# Beca — config principal (XDG)
-# Local: $XDG_CONFIG_HOME/beca/config.toml  (default: ~/.config/beca/config.toml)
-# Precedência: CLI flags > variáveis de ambiente > config.toml > defaults embutidos
+# Beca — main config (XDG)
+# Location: $XDG_CONFIG_HOME/beca/config.toml  (default: ~/.config/beca/config.toml)
+# Precedence: CLI flags > environment variables > config.toml > built-in defaults
 
 [core]
-# Tema ativo (nome de arquivo em themes/<nome>.toml ou "default")
+# Active theme (file name in themes/<name>.toml or "default")
 theme = "default"
-# Nível de log: error|warn|info|debug
+# Log level: error|warn|info|debug
 log_level = "info"
 
 [shell]
-# Integração Hyprland/Wayland (reservado para módulos de shell)
-# ex.: layer, anchor, exclusividade — definidos por módulo quando aplicável
+# Hyprland/Wayland integration (reserved for shell modules)
+# e.g.: layer, anchor, exclusivity — defined per module when applicable
 
 [modules.voice]
-# Módulo de captura/transcrição (componente beca-ui: VoiceCaptureWindow)
+# Capture/transcription module (beca-ui component: VoiceCaptureWindow)
 enabled = true
 daemon_url = "http://127.0.0.1:4100"   # override: env VOICE_DAEMON_URL
-# comportamento padrão: "pipe" (stdout+exit, compat Hyprland binds) | "hold" (UI com resultado)
+# default mode: "pipe" (stdout+exit, Hyprland binds compatible) | "hold" (UI with result)
 mode = "pipe"
 prefer_sample_rate = 16000
 channels = 1
-# script Lua de comportamento (opcional, override em disco; fallback embutido)
-# script = "scripts/voice.lua"          # relativo a $XDG_CONFIG_HOME/beca/
-# Responder com LLM e falar via TTS após transcrição (fluxo assistente/kokoro)
+# Lua behavior script (optional, disk override; embedded fallback)
+# script = "scripts/voice.lua"          # relative to $XDG_CONFIG_HOME/beca/
+# Respond via LLM and speak via TTS after transcription (assistant/kokoro flow)
 respond = true
-# Comandos opcionais (shell): stdout = resposta; $TRANSCRIPT/$TEXT disponíveis
+# Optional shell commands: stdout = answer; $TRANSCRIPT/$TEXT available
 # respond_command = "..."
 # tts_command = "..."
 
 [modules.voice.ui]
-# Overrides de UI/params sem recompilar (injetados como props)
+# UI/params overrides without recompiling (injected as props)
 title = "Voice Capture"
-status_recording = "Gravando..."
-status_transcribing = "Transcrevendo áudio..."
-status_responding = "Pensando resposta..."
-status_speaking = "Falando resposta..."
+status_recording = "Recording..."
+status_transcribing = "Transcribing..."
+status_responding = "Thinking..."
+status_speaking = "Speaking..."
 
 # [modules.launcher]
 # enabled = true
 
 [modules.bar]
 enabled = true
-# Formato do relógio (strftime), ex.: "%H:%M" ou "%H:%M:%S"
+# Clock format (strftime), e.g.: "%H:%M" or "%H:%M:%S"
 clock_format = "%H:%M"
 show_clock = true
 show_launcher = true
 launcher_label = "Apps"
 height = 34.0
-# Reserva espaço (zona exclusiva/struts) para janelas não sobreporem a barra
+# Reserve space (exclusive zone/struts) so tiled windows don't overlap the bar
 exclusive = true
-# Layout: 3 seções (left/center/right) com alinhamento e posição dos widgets
+# Layout: 3 sections (left/center/right) with per-section alignment and widget placement
 clock_section = "center"      # left | center | right
 launcher_section = "left"     # left | center | right
 left_align = "start"          # start | center | end
 center_align = "center"       # start | center | end
 right_align = "end"          # start | center | end
-# Opacidade do fundo da barra (0.0 = transparente, 1.0 = opaco)
+# Bar background opacity (0.0 = transparent, 1.0 = opaque)
 background_opacity = 1.0
-# Exibir contorno/borda da barra
+# Show the bar border/outline
 show_border = false
-# Widgets de volume (PipeWire/wpctl ou PulseAudio/pactl)
-show_volume_out = true        # saída (sink)
-show_volume_in = true         # entrada (source/microfone)
+# Volume widgets (PipeWire/wpctl or PulseAudio/pactl)
+show_volume_out = true        # output (sink)
+show_volume_in = true         # input (source/microphone)
 volume_out_section = "right"  # left | center | right
 volume_in_section = "right"   # left | center | right
-# Widget de voz (abre a janela de captura/transcrição)
+# Voice widget (opens the capture/transcription window)
 show_voice = true
 voice_label = "Voice"
 voice_section = "left"        # left | center | right

@@ -11,7 +11,7 @@ use std::time::Duration;
 use beca_ui::ui_loader;
 
 fn format_clock(format: &str) -> String {
-    // Use `date` for local-time strftime formatting (no extra deps).
+
     let out = Command::new("date").arg(format!("+{}", format)).output();
     match out {
         Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).trim().to_string(),
@@ -34,7 +34,7 @@ fn read_volume_wpctl(target: &str) -> Option<VolumeInfo> {
         return None;
     }
     let s = String::from_utf8_lossy(&out.stdout);
-    // e.g. "Volume: 0.39" or "Volume: 0.72 [MUTED]"
+
     let muted = s.contains("[MUTED]");
     let vol = s
         .split_whitespace()
@@ -121,7 +121,7 @@ pub fn dispatch(action: &str, args: &[String]) -> Result<()> {
             show(pos)
         }
         "status" => {
-            // best-effort: query daemon if available
+
             let resp = crate::daemon::send_request(&serde_json::json!({"type":"bar.status"}));
             match resp {
                 Ok(v) => {
@@ -141,8 +141,7 @@ pub fn dispatch(action: &str, args: &[String]) -> Result<()> {
             }
         }
         "hide" | "hide-top" | "hide-bottom" | "stop" | "stop-top" | "stop-bottom" => {
-            // lifecycle (stop/hide tracked instance) is managed by daemon; local process cannot
-            // hide an already-running bar instance. Try to route via daemon.
+
             let target = format!("bar:{action}");
             if let Some(resp) = crate::daemon::try_route_mod(&target, args) {
                 println!(
@@ -193,12 +192,12 @@ fn hypr_dispatch_socket(cmd: &str) -> Option<String> {
 }
 
 fn hypr_eval(lua: &str) -> Option<String> {
-    // 0.57+: socket accepts `eval <lua>`
+
     hypr_dispatch_socket(&format!("eval {lua}"))
 }
 
 fn set_monitor_reserved(monitor_name: &str, position: &str, height: i64, enable: bool) {
-    // Preserve other reserved edges (array observed: [left, top, right, bottom]).
+
     let mut left = 0i64;
     let mut top = 0i64;
     let mut right = 0i64;
@@ -242,7 +241,6 @@ fn set_monitor_reserved(monitor_name: &str, position: &str, height: i64, enable:
     let _ = hypr_eval(&lua);
 }
 
-/// Clear reserved edge for a bar position on all monitors (best-effort, daemon stop path).
 pub fn clear_reserved_for_position(position: &str) {
     let monitors_out = Command::new("hyprctl")
         .args(["monitors", "-j"])
@@ -258,8 +256,7 @@ pub fn clear_reserved_for_position(position: &str) {
         let Some(name) = m.get("name").and_then(|v| v.as_str()) else {
             continue;
         };
-        // preserve other edges? we only manage top/bottom for bars; set both managed edges as needed.
-        // Safer: read current reserved [l,t,r,b] and zero only the relevant edge.
+
         let reserved = m.get("reserved").and_then(|v| v.as_array());
         let l = reserved
             .and_then(|a| a.get(0))
@@ -289,14 +286,10 @@ pub fn clear_reserved_for_position(position: &str) {
     }
 }
 
-/// Best-effort Hyprland 0.57+ docking for the bar window (top/bottom).
-/// Returns the monitor name if docked (used for exclusive-zone cleanup).
 fn dock_bar_hyprland(position: &str, height: f32, exclusive: bool) -> Option<String> {
     let pid = std::process::id();
     let h = (height.max(24.0)) as i64;
 
-    // Wait for the bar window to map and appear in Hyprland clients (fixes displaced spawn).
-    // Poll quickly at start to reduce visible time at wrong coordinates.
     let mut addr: Option<String> = None;
     let mut mon_id: i64 = 0;
     for attempt in 0..60 {
@@ -336,7 +329,6 @@ fn dock_bar_hyprland(position: &str, height: f32, exclusive: bool) -> Option<Str
     }
     let addr = addr?;
 
-    // Resolve monitor geometry.
     let monitors_out = Command::new("hyprctl")
         .args(["monitors", "-j"])
         .output()
@@ -376,7 +368,6 @@ fn dock_bar_hyprland(position: &str, height: f32, exclusive: bool) -> Option<Str
         (mx, my)
     };
 
-    // Remember active window to restore focus (bar must not steal focus / be killable via Super+Q).
     let prev_active = Command::new("hyprctl")
         .args(["activewindow", "-j"])
         .output()
@@ -385,23 +376,19 @@ fn dock_bar_hyprland(position: &str, height: f32, exclusive: bool) -> Option<Str
         .and_then(|o| serde_json::from_slice::<serde_json::Value>(&o.stdout).ok())
         .and_then(|v| v.get("address").and_then(|a| a.as_str()).map(|s| s.to_string()));
 
-    // Hyprland 0.57+ Lua dispatch API: `dispatch <dispatcher-expr>` (hl.dsp.*).
-    // Prefer address-targeted operations; avoid leaving focus on the bar.
     let focus = format!("dispatch hl.dsp.focus({{window = 'address:{addr}'}})");
     let move_cmd = format!("dispatch hl.dsp.window.move({{x={x},y={y}}})");
     let resize = format!("dispatch hl.dsp.window.resize({{x={mw},y={h}}})");
 
-    // Multiple passes to win races with initial map/layout and keep it docked.
     for i in 0..8 {
         let _ = hypr_dispatch_socket(&focus);
         let _ = hypr_dispatch_socket(&move_cmd);
         let _ = hypr_dispatch_socket(&resize);
-        // move quickly at first to minimize visible wrong placement
+
         let wait = if i < 3 { 30 } else { 80 };
         thread::sleep(Duration::from_millis(wait));
     }
 
-    // Fallback: legacy string dispatch with explicit target address.
     let _ = hypr_dispatch_socket(&format!(
         "dispatch movewindowpixel exact {x} {y},address:{addr}"
     ));
@@ -409,7 +396,6 @@ fn dock_bar_hyprland(position: &str, height: f32, exclusive: bool) -> Option<Str
         "dispatch resizewindowpixel exact {mw} {h},address:{addr}"
     ));
 
-    // Pin (toggle dispatcher): only pin if not already pinned.
     let pinned_now = Command::new("hyprctl")
         .args(["clients", "-j"])
         .output()
@@ -427,7 +413,6 @@ fn dock_bar_hyprland(position: &str, height: f32, exclusive: bool) -> Option<Str
         let _ = hypr_dispatch_socket("dispatch hl.dsp.window.pin()");
     }
 
-    // Restore focus so Super+Q (killactive) doesn't target the bar.
     if let Some(prev) = prev_active {
         if prev != addr {
             let _ = hypr_dispatch_socket(&format!("dispatch focuswindow address:{prev}"));
@@ -438,7 +423,6 @@ fn dock_bar_hyprland(position: &str, height: f32, exclusive: bool) -> Option<Str
         let _ = hypr_dispatch_socket("dispatch cyclenext");
     }
 
-    // Exclusive zone: reserve space so tiled windows don't overlap the bar.
     if exclusive && !mon_name.is_empty() {
         set_monitor_reserved(&mon_name, position, h, true);
     }
@@ -453,6 +437,49 @@ fn dock_bar_hyprland(position: &str, height: f32, exclusive: bool) -> Option<Str
 pub fn show(position: &str) -> Result<()> {
     let resolved = beca_core::config::load();
     let bar_cfg = &resolved.config.modules.bar;
+    let theme = &resolved.theme;
+
+    #[cfg(target_os = "linux")]
+    {
+        let force_window = std::env::var_os("BECA_BAR_FORCE_WINDOW").is_some();
+        if !force_window {
+            let pos = match position {
+                "bottom" => beca_layer_shell::BarPosition::Bottom,
+                _ => beca_layer_shell::BarPosition::Top,
+            };
+            match beca_layer_shell::run_bar(pos, bar_cfg, theme) {
+                Ok(()) => return Ok(()),
+                Err(e) => {
+                    eprintln!("[beca-bar] layer-shell unavailable, falling back to window mode: {e}");
+
+                    if e.contains("dispatch:")
+                        || e.contains("roundtrip:")
+                        || e.contains("flush:")
+                        || e.contains("Backend error")
+                        || e.contains("Connection reset")
+                    {
+                        if let Ok(exe) = std::env::current_exe() {
+                            let status = Command::new(exe)
+                                .env("BECA_NO_DAEMON", "1")
+                                .env("BECA_BAR_FORCE_WINDOW", "1")
+                                .args(["mod", "--local", &format!("bar:show-{}", position)])
+                                .status();
+                            match status {
+                                Ok(s) if s.success() => return Ok(()),
+                                Ok(s) => anyhow::bail!(
+                                    "bar window fallback process exited with status {s}"
+                                ),
+                                Err(err) => anyhow::bail!(
+                                    "failed to spawn bar window fallback: {err}"
+                                ),
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     let theme = resolved.theme.voice_theme();
 
     let app = ui_loader::create("BarWindow").map_err(|e| anyhow::anyhow!(e))?;
@@ -474,7 +501,7 @@ pub fn show(position: &str) -> Result<()> {
     );
     let _ = app.set_property("show-voice-assistant", Value::Bool(true));
     let _ = app.set_property("voice-assistant-label", Value::String("VA".into()));
-    // layout: 3 sections (left/center/right) with per-section alignment and widget placement
+
     let _ = app.set_property(
         "clock-section",
         Value::String(bar_cfg.clock_section.clone().into()),
@@ -516,7 +543,7 @@ pub fn show(position: &str) -> Result<()> {
         Value::Number(bar_cfg.background_opacity as f64),
     );
     let _ = app.set_property("show-border", Value::Bool(bar_cfg.show_border));
-    // set initial clock/volume text
+
     let initial = format_clock(&bar_cfg.clock_format);
     let _ = app.set_property("clock-text", Value::String(initial.into()));
     if bar_cfg.show_volume_out {
@@ -530,7 +557,6 @@ pub fn show(position: &str) -> Result<()> {
         let _ = app.set_property("volume-in-muted", Value::Bool(v.muted));
     }
 
-    // launcher click -> spawn launcher in separate process (bar stays alive)
     let _ = app.set_callback("launcher-clicked", |_args| {
         let exe = std::env::current_exe()
             .ok()
@@ -540,37 +566,68 @@ pub fn show(position: &str) -> Result<()> {
         Value::Void
     });
 
-    // voice click -> ask resident voice to show (daemon-routed), avoiding duplicate windows.
-    // default: respond+TTS assistant flow (configurable via modules.voice.respond)
-    let _ = app.set_callback("voice-clicked", |_args| {
-        // If a Voice Capture window already exists, focus it instead of spawning another.
-        if let Ok(out) = Command::new("hyprctl")
-            .args(["clients", "-j"])
-            .output()
-        {
-            if out.status.success() {
-                if let Ok(clients) = serde_json::from_slice::<Vec<serde_json::Value>>(&out.stdout) {
-                    if let Some(addr) = clients.iter().find_map(|c| {
-                        let title = c.get("title").and_then(|v| v.as_str()).unwrap_or("");
-                        if title == "Voice Capture" || title == "Voice Assistant" {
-                            c.get("address").and_then(|v| v.as_str()).map(|s| s.to_string())
-                        } else {
-                            None
-                        }
-                    }) {
-                        let _ = Command::new("hyprctl")
-                            .args(["dispatch", "focuswindow", &format!("address:{addr}")])
-                            .spawn();
-                        return Value::Void;
+    let quick_slot: Arc<std::sync::Mutex<Option<std::process::Child>>> =
+        Arc::new(std::sync::Mutex::new(None));
+
+    {
+        let quick_slot = quick_slot.clone();
+        let weak_voice = app.as_weak();
+        let _ = app.set_callback("voice-clicked", move |_args| {
+            let mut slot = match quick_slot.lock() {
+                Ok(s) => s,
+                Err(_) => return Value::Void,
+            };
+
+            let mut alive = false;
+            if let Some(child) = slot.as_mut() {
+                match child.try_wait() {
+                    Ok(None) => alive = true,
+                    Ok(Some(_)) => {
+                        *slot = None;
                     }
+                    Err(_) => alive = true,
                 }
             }
-        }
-        // Ask daemon/resident directly (avoids spawning an extra CLI process).
-        let req = serde_json::json!({"type":"mod","target":"voice:show","args":[]});
-        let _ = crate::daemon::send_request(&req);
-        Value::Void
-    });
+            if alive {
+
+                if let Some(dir) = std::env::var_os("XDG_RUNTIME_DIR") {
+                    let path = std::path::PathBuf::from(dir)
+                        .join("beca")
+                        .join("quick.ctl");
+                    if let Ok(mut s) = std::os::unix::net::UnixStream::connect(&path) {
+                        use std::io::Write;
+                        let _ = s.write_all(b"send\n");
+                    } else {
+                        eprintln!("[beca-bar] quick session ctl unreachable: {}", path.display());
+                    }
+                }
+                return Value::Void;
+            }
+
+            if let Ok(exe) = std::env::current_exe() {
+                let child = Command::new(exe)
+                    .env("BECA_NO_DAEMON", "1")
+                    .arg("mod")
+                    .arg("--local")
+                    .arg("voice:quick")
+                    .arg("--respond")
+                    .spawn();
+                match child {
+                    Ok(c) => {
+                        *slot = Some(c);
+                        let weak2 = weak_voice.clone();
+                        let _ = ui_loader::invoke_on_event_loop(move || {
+                            if let Some(app) = weak2.upgrade() {
+                                let _ = app.set_property("voice-recording", Value::Bool(true));
+                            }
+                        });
+                    }
+                    Err(e) => eprintln!("[beca-bar] failed to spawn voice:quick: {e}"),
+                }
+            }
+            Value::Void
+        });
+    }
 
     let _ = app.set_callback("voice-assistant-clicked", |_args| {
         if let Ok(out) = Command::new("hyprctl").args(["clients", "-j"]).output() {
@@ -599,14 +656,50 @@ pub fn show(position: &str) -> Result<()> {
 
     let running = Arc::new(AtomicBool::new(true));
 
-    // clock updater thread
+    {
+        let quick_slot = quick_slot.clone();
+        let weak_poll = app.as_weak();
+        let running_flag = running.clone();
+        thread::spawn(move || {
+            let mut was_running = false;
+            while running_flag.load(Ordering::Relaxed) {
+                let mut run = false;
+                if let Ok(mut slot) = quick_slot.lock() {
+                    if let Some(child) = slot.as_mut() {
+                        match child.try_wait() {
+                            Ok(Some(_)) => {
+                                *slot = None;
+                            }
+                            Ok(None) => {
+                                run = true;
+                            }
+                            Err(_) => {
+                                run = true;
+                            }
+                        }
+                    }
+                }
+                if run != was_running {
+                    was_running = run;
+                    let weak2 = weak_poll.clone();
+                    let _ = ui_loader::invoke_on_event_loop(move || {
+                        if let Some(app) = weak2.upgrade() {
+                            let _ = app.set_property("voice-recording", Value::Bool(run));
+                        }
+                    });
+                }
+                thread::sleep(Duration::from_millis(250));
+            }
+        });
+    }
+
     let weak_clock = app.as_weak();
     let fmt = bar_cfg.clock_format.clone();
     let show_clock = bar_cfg.show_clock;
     if show_clock {
         let running_flag = running.clone();
         thread::spawn(move || {
-            // update roughly every 30s normally, 1s if format includes seconds
+
             let interval = if fmt.contains("%S") {
                 Duration::from_secs(1)
             } else {
@@ -625,7 +718,6 @@ pub fn show(position: &str) -> Result<()> {
         });
     }
 
-    // volume updater thread (output/input)
     let show_volume_out = bar_cfg.show_volume_out;
     let show_volume_in = bar_cfg.show_volume_in;
     if show_volume_out || show_volume_in {
@@ -661,7 +753,6 @@ pub fn show(position: &str) -> Result<()> {
         });
     }
 
-    // Best-effort: dock/anchor bar on Hyprland (compatible with 0.57+ lua dispatch).
     let pos = position.to_string();
     let dock_h = bar_cfg.height;
     let exclusive = bar_cfg.exclusive;
@@ -677,7 +768,7 @@ pub fn show(position: &str) -> Result<()> {
     ui_loader::show(&app).map_err(|e| anyhow::anyhow!(e))?;
     ui_loader::run_event_loop().map_err(|e| anyhow::anyhow!(e))?;
     running.store(false, Ordering::Relaxed);
-    // Best-effort cleanup of exclusive zone on normal exit.
+
     if exclusive {
         if let Ok(slot) = dock_monitor.lock() {
             if let Some(mon) = slot.as_ref() {

@@ -1,14 +1,14 @@
-# Beca — tema (runtime, sem recompilar)
-# Local: $XDG_CONFIG_HOME/beca/themes/<nome>.toml
-# Tokens injetados nas propriedades do Theme global (beca-ui) na inicialização.
-# Requer que os tokens do Theme sejam setáveis em runtime (in-out/in) — ajuste de implementação.
+# Beca — theme (runtime, no recompile)
+# Location: $XDG_CONFIG_HOME/beca/themes/<name>.toml
+# Tokens are injected into the Theme global properties (beca-ui) at startup.
+# Requires the Theme tokens to be runtime-settable (in-out/in) — an implementation detail.
 
 [meta]
 name = "default"
 variant = "dark" # dark | light
 
 [colors]
-# mapeiam para Theme: background, text-main, card-bg, card-border, accent, etc.
+# map to Theme: background, text-main, card-bg, card-border, accent, etc.
 background = "#1E1E1E"
 text_main = "#FFFFFF"
 text_strong = "#FFFFFF"
@@ -23,6 +23,6 @@ accent_danger = "#a04040"
 recording = "#f7768e"
 
 [metrics]
-# raios/espaçamentos (px) — conforme tokens expostos pelo Theme
+# radius/spacing (px) — as exposed by the Theme tokens
 radius = 6
 # font_family = "Sans"

@@ -1,18 +1,8 @@
-//! Single source of truth for applying beca themes to Slint components.
-//!
-//! Both runtime paths funnel through here:
-//!   * typed windows (`slint::include_modules!` → [`ThemeTokens::apply_typed`]);
-//!   * interpreter-loaded windows ([`ThemeTokens::apply_interpreter`]).
-//!
-//! Keeping the token list and the hex parsing in one place means adding a new
-//! theme token only requires editing this module plus `ui/theme.slint`.
-
 use slint::{Brush, Color};
 use slint_interpreter::{ComponentInstance, Value};
 
 use crate::voice::VoiceTheme;
 
-/// Parse `#RRGGBB` or `#RRGGBBAA` into a Slint color.
 pub fn parse_color(hex: &str) -> Option<Color> {
     let h = hex.trim().trim_start_matches('#');
     match h.len() {
@@ -33,8 +23,6 @@ pub fn parse_color(hex: &str) -> Option<Color> {
     }
 }
 
-/// Theme tokens parsed into Slint values, ready to be pushed into the `Theme`
-/// global of any window (typed or interpreted).
 #[derive(Clone, Debug, PartialEq)]
 pub struct ThemeTokens {
     pub dark_mode: bool,
@@ -55,7 +43,7 @@ pub struct ThemeTokens {
 
 impl Default for ThemeTokens {
     fn default() -> Self {
-        // Mirrors the defaults declared in `ui/theme.slint`.
+
         let c = |hex: &str| parse_color(hex).expect("valid default color");
         Self {
             dark_mode: true,
@@ -77,9 +65,7 @@ impl Default for ThemeTokens {
 }
 
 impl ThemeTokens {
-    /// Parse the stringly-typed [`VoiceTheme`] (the config-agnostic carrier used
-    /// by `beca_ui::voice`) into Slint values. Unknown colors fall back to the
-    /// corresponding default token.
+
     pub fn from_voice_theme(t: &VoiceTheme) -> Self {
         let d = Self::default();
         let color = |hex: &str, fallback: Color| parse_color(hex).unwrap_or(fallback);
@@ -106,7 +92,6 @@ impl ThemeTokens {
         }
     }
 
-    /// Push every token into the `Theme` global of a typed window.
     pub fn apply_typed(&self, g: &crate::Theme) {
         g.set_dark_mode(self.dark_mode);
         g.set_radius(self.radius);
@@ -124,7 +109,6 @@ impl ThemeTokens {
         g.set_recording(self.recording.clone());
     }
 
-    /// Push every token into the `Theme` global of an interpreter instance.
     pub fn apply_interpreter(&self, app: &ComponentInstance) {
         let set = |name: &str, value: Value| {
             let _ = app.set_global_property("Theme", name, value);
@@ -146,7 +130,6 @@ impl ThemeTokens {
     }
 }
 
-/// Convenience: apply a [`VoiceTheme`] to a typed window's `Theme` global.
 pub fn apply_voice_theme_typed(g: &crate::Theme, t: &VoiceTheme) {
     ThemeTokens::from_voice_theme(t).apply_typed(g);
 }

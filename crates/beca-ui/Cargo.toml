@@ -7,9 +7,6 @@ version.workspace = true
 name = "beca_ui"
 path = "src/lib.rs"
 
-[[bin]]
-name = "beca-voice"
-path = "src/bin_voice.rs"
 
 [dependencies]
 slint.workspace = true

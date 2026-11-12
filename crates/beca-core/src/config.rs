@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::tema::{Theme, load_theme};
+use crate::theme::{Theme, load_theme};
 
 #[derive(Debug, Clone)]
 pub struct BecaPaths {
@@ -100,27 +100,27 @@ pub struct BarModuleConfig {
     pub show_launcher: bool,
     pub launcher_label: String,
     pub height: f32,
-    /// Reserve space (exclusive zone/struts) so tiled windows don't overlap the bar.
+
     pub exclusive: bool,
-    /// Section placement: "left" | "center" | "right"
+
     pub clock_section: String,
     pub launcher_section: String,
-    /// Section alignment: "start" | "center" | "end"
+
     pub left_align: String,
     pub center_align: String,
     pub right_align: String,
-    /// Opacidade do fundo da barra (0.0 = transparente, 1.0 = opaco).
+
     #[serde(alias = "opacity", alias = "bar_opacity", alias = "background-opacity")]
     pub background_opacity: f32,
-    /// Exibir contorno/borda da barra.
+
     #[serde(alias = "border", alias = "show-border")]
     pub show_border: bool,
-    /// Widgets de volume (saída/entrada)
+
     pub show_volume_out: bool,
     pub show_volume_in: bool,
     pub volume_out_section: String,
     pub volume_in_section: String,
-    /// Widget de voz (abre `beca mod voice:show`)
+
     pub show_voice: bool,
     pub voice_label: String,
     pub voice_section: String,
@@ -149,7 +149,7 @@ impl Default for BarModuleConfig {
             volume_in_section: "right".into(),
             show_voice: true,
             voice_label: "Voice".into(),
-            voice_section: "left".into(),
+            voice_section: "center".into(),
         }
     }
 }
@@ -176,14 +176,18 @@ pub struct VoiceModuleConfig {
     pub prefer_sample_rate: u32,
     pub channels: u16,
     pub script: Option<String>,
-    /// Responder via LLM e falar via TTS após transcrição (fluxo assistente/kokoro).
+
     pub respond: bool,
-    /// Comando para gerar resposta (recebe transcrição em $TRANSCRIPT; stdout = resposta).
-    /// Se vazio, usa fluxo padrão (q-context_builder assist + q-rs) quando disponível.
+
     pub respond_command: String,
-    /// Comando TTS para falar a resposta (recebe texto em $TEXT ou como argumento).
-    /// Se vazio, usa voice-cli.sh api tts quando disponível.
+
     pub tts_command: String,
+
+    pub respond_stream: bool,
+
+    pub llm_url: String,
+
+    pub llm_model: String,
     pub ui: VoiceUiConfig,
 }
 
@@ -199,6 +203,9 @@ impl Default for VoiceModuleConfig {
             respond: true,
             respond_command: String::new(),
             tts_command: String::new(),
+            respond_stream: false,
+            llm_url: "http://127.0.0.1:8787".into(),
+            llm_model: "openrouter/openrouter/free".into(),
             ui: VoiceUiConfig::default(),
         }
     }
@@ -218,10 +225,10 @@ impl Default for VoiceUiConfig {
     fn default() -> Self {
         Self {
             title: "Voice Capture".into(),
-            status_recording: "Gravando...".into(),
-            status_transcribing: "Transcrevendo áudio...".into(),
-            status_responding: "Pensando resposta...".into(),
-            status_speaking: "Falando resposta...".into(),
+            status_recording: "Recording...".into(),
+            status_transcribing: "Transcribing...".into(),
+            status_responding: "Thinking...".into(),
+            status_speaking: "Speaking...".into(),
         }
     }
 }
@@ -249,7 +256,6 @@ pub fn load_config_from(path: &Path) -> (Config, Option<PathBuf>) {
     }
 }
 
-/// Apply environment overrides (ENV > file > defaults).
 pub fn apply_env(cfg: &mut Config) {
     if let Ok(v) = std::env::var("VOICE_DAEMON_URL") {
         if !v.is_empty() {
@@ -268,7 +274,6 @@ pub fn apply_env(cfg: &mut Config) {
     }
 }
 
-/// Load config + theme from XDG paths, apply env overrides. Caller applies CLI overrides.
 pub fn load() -> Resolved {
     let paths = BecaPaths::resolve();
     load_with_paths(paths)
