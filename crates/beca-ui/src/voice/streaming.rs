@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver};
 use std::sync::Arc;
 use std::thread;
+use std::time::Instant;
 
 use serde_json::Value as JsonValue;
 
@@ -31,14 +32,21 @@ pub fn stream_and_speak(
     if user_text.trim().is_empty() {
         return Err("empty transcript".to_string());
     }
+    let t_pipeline = Instant::now();
     let (tx, rx) = sync_channel::<String>(8);
     let tts = spawn_tts_worker(opts.clone(), rx);
 
     let mut answer = String::new();
     let mut pending = String::new();
     let mut error: Option<String> = None;
+    let mut first_token_at: Option<Instant> = None;
 
     match read_sse(opts, user_text, cancel, &mut |delta| {
+        if first_token_at.is_none() {
+            let at = Instant::now();
+            first_token_at = Some(at);
+            eprintln!("[voice][timing] llm ttft {:?}", at.duration_since(t_pipeline));
+        }
         answer.push_str(delta);
         on_text(&answer);
         pending.push_str(delta);
@@ -52,17 +60,39 @@ pub fn stream_and_speak(
         Ok(()) => {}
         Err(e) => error = Some(e),
     }
+    eprintln!("[voice][timing] llm total {:?}", t_pipeline.elapsed());
 
     if !pending.trim().is_empty() {
         let _ = tx.send(pending);
     }
     drop(tx);
     let _ = tts.join();
+    eprintln!("[voice][timing] respond pipeline {:?}", t_pipeline.elapsed());
 
     match error {
         Some(e) => Err(e),
         None => Ok(answer),
     }
+}
+
+const ABBREVIATIONS: &[&str] = &[
+    "sr", "sra", "srta", "dr", "dra", "prof", "profa", "eng", "exmo", "exma", "av", "est", "apto",
+    "ref", "tel", "cel", "ltda", "inc", "vs",
+];
+
+fn is_abbreviation(prefix: &str) -> bool {
+    let token = prefix
+        .rsplit(|c: char| !c.is_alphanumeric())
+        .next()
+        .unwrap_or("");
+    if token.is_empty() {
+        return false;
+    }
+    let normalized = token.to_lowercase();
+    if normalized.chars().count() == 1 && normalized.chars().next().is_some_and(|c| c.is_alphabetic()) {
+        return true;
+    }
+    ABBREVIATIONS.contains(&normalized.as_str())
 }
 
 fn take_chunk(pending: &str) -> Option<(String, String)> {
@@ -73,6 +103,9 @@ fn take_chunk(pending: &str) -> Option<(String, String)> {
     for (idx, byte) in bytes.iter().enumerate() {
         if matches!(byte, b'.' | b'!' | b'?' | b'\n') {
             let next = bytes.get(idx + 1).copied();
+            if matches!(byte, b'.') && is_abbreviation(&trimmed[..idx]) {
+                continue;
+            }
             if next.is_none() || next == Some(b' ') || next == Some(b'\n') {
                 cut = Some(idx + 1);
                 break;
@@ -169,8 +202,14 @@ fn read_sse(
 fn spawn_tts_worker(opts: StreamOptions, rx: Receiver<String>) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         while let Ok(chunk) = rx.recv() {
-            if let Err(e) = speak(&opts, &chunk) {
-                eprintln!("[voice] tts failed: {e}");
+            let t = Instant::now();
+            match speak(&opts, &chunk) {
+                Ok(()) => eprintln!(
+                    "[voice][timing] tts sentence {} chars in {:?}",
+                    chunk.chars().count(),
+                    t.elapsed()
+                ),
+                Err(e) => eprintln!("[voice] tts failed: {e}"),
             }
         }
     })
@@ -229,5 +268,29 @@ mod tests {
         assert!(!chunk.is_empty());
         assert!(!rest.is_empty());
         assert!(chunk.chars().count() <= MAX_CHUNK_CHARS);
+    }
+
+    #[test]
+    fn does_not_split_on_common_abbreviations() {
+        assert!(take_chunk("fale com Dr. Silva e me avise hoje cedo").is_none());
+        assert!(take_chunk("a Sra. Maria ligou agora a pouco").is_none());
+        assert!(take_chunk("conforme a ref. 123 do processo").is_none());
+        let (chunk, rest) = take_chunk("fale com Dr. Silva. depois avise a equipe toda").expect("chunk");
+        assert_eq!(chunk, "fale com Dr. Silva.");
+        assert_eq!(rest, "depois avise a equipe toda");
+    }
+
+    #[test]
+    fn ellipsis_still_splits() {
+        let (chunk, rest) = take_chunk("Hmm... pronto.").expect("chunk");
+        assert_eq!(chunk, "Hmm...");
+        assert_eq!(rest, "pronto.");
+    }
+
+    #[test]
+    fn decimal_numbers_do_not_split() {
+        let (chunk, rest) = take_chunk("o total foi R$ 2.500,00 hoje. ok valeu").expect("chunk");
+        assert_eq!(chunk, "o total foi R$ 2.500,00 hoje.");
+        assert_eq!(rest, "ok valeu");
     }
 }

@@ -499,15 +499,22 @@ pub(crate) fn generate_response_streaming(
     })
 }
 
+const SPEECH_SUFFIX: &str = "You are speaking with the user via voice (the text will be synthesized and played aloud). Answer in Brazilian Portuguese. Use short, direct sentences, no more than one or two breaths each. No markdown, no lists, no asterisks, no code, no emoji. Do not repeat the question. Prefer two or three sentences.";
+
 fn system_prompt_assist() -> String {
     let script = "q-context_builder assist 2>/dev/null";
     let out = std::process::Command::new("bash")
         .arg("-lc")
         .arg(script)
         .output();
-    match out {
+    let base = match out {
         Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).trim().to_string(),
         _ => String::new(),
+    };
+    if base.is_empty() {
+        SPEECH_SUFFIX.to_string()
+    } else {
+        format!("{base}\n\n{SPEECH_SUFFIX}")
     }
 }
 
@@ -992,6 +999,7 @@ pub fn run_capture_ui_with(
                 if is_stale() {
                     return;
                 }
+                let t_stt = std::time::Instant::now();
                 let result = (|| {
                     if samples.is_empty() {
                         return Err("empty audio capture".to_string());
@@ -1005,6 +1013,7 @@ pub fn run_capture_ui_with(
                     }
                     super::transcribe::transcribe(&base_url, &out_path)
                 })();
+                eprintln!("[voice][timing] stt {:?}", t_stt.elapsed());
 
                 match result {
                     Ok(text) if respond_now => {
