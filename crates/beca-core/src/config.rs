@@ -80,6 +80,7 @@ pub struct ShellConfig {}
 pub struct ModulesConfig {
     pub voice: VoiceModuleConfig,
     pub bar: BarModuleConfig,
+    pub bar_bottom: Option<BarModuleConfig>,
 }
 
 impl Default for ModulesConfig {
@@ -87,6 +88,34 @@ impl Default for ModulesConfig {
         Self {
             voice: VoiceModuleConfig::default(),
             bar: BarModuleConfig::default(),
+            bar_bottom: None,
+        }
+    }
+}
+
+impl ModulesConfig {
+    pub fn effective_bottom_bar(&self) -> BarModuleConfig {
+        self.bar_bottom.clone().unwrap_or_else(BarModuleConfig::default_bottom)
+    }
+
+    pub fn bottom_bar_enabled(&self) -> bool {
+        self.bar.enabled && self.effective_bottom_bar().enabled
+    }
+
+    pub fn effective_top_bar(&self) -> BarModuleConfig {
+        let mut c = self.bar.clone();
+        if self.bottom_bar_enabled() {
+            c.show_volume_out = false;
+            c.show_volume_in = false;
+        }
+        c
+    }
+
+    pub fn bar_config_for(&self, position: &str) -> BarModuleConfig {
+        if position == "bottom" {
+            self.effective_bottom_bar()
+        } else {
+            self.effective_top_bar()
         }
     }
 }
@@ -148,6 +177,34 @@ impl Default for BarModuleConfig {
             volume_out_section: "right".into(),
             volume_in_section: "right".into(),
             show_voice: true,
+            voice_label: "Voice".into(),
+            voice_section: "center".into(),
+        }
+    }
+}
+
+impl BarModuleConfig {
+    pub fn default_bottom() -> Self {
+        Self {
+            enabled: true,
+            clock_format: "%H:%M".into(),
+            show_clock: false,
+            show_launcher: false,
+            launcher_label: "Apps".into(),
+            height: 34.0,
+            exclusive: true,
+            clock_section: "center".into(),
+            launcher_section: "left".into(),
+            left_align: "start".into(),
+            center_align: "center".into(),
+            right_align: "end".into(),
+            background_opacity: 1.0,
+            show_border: false,
+            show_volume_out: true,
+            show_volume_in: true,
+            volume_out_section: "right".into(),
+            volume_in_section: "right".into(),
+            show_voice: false,
             voice_label: "Voice".into(),
             voice_section: "center".into(),
         }

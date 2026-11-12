@@ -336,7 +336,13 @@ impl PointerHandler for BarState {
                             inst.window.dispatch_event(WindowEvent::PointerReleased { position: pos, button: btn });
                         }
                     }
-                    Axis { .. } => {}
+                    Axis { horizontal, vertical, .. } => {
+                        let dx = -horizontal.absolute as f32;
+                        let dy = -vertical.absolute as f32;
+                        if dx != 0.0 || dy != 0.0 {
+                            inst.window.dispatch_event(WindowEvent::PointerScrolled { position: pos, delta_x: dx, delta_y: dy });
+                        }
+                    }
                 }
                 inst.window.request_redraw();
             }
@@ -458,6 +464,30 @@ fn setup_callbacks(bar: &BarWindow, converse_slot: std::sync::Arc<Mutex<Option<s
             bar.set_conversation_active(active);
         }
     });
+    let weak_out = bar.as_weak();
+    bar.on_volume_out_scrolled(move |delta| {
+        if delta == 0.0 {
+            return;
+        }
+        adjust_volume("@DEFAULT_AUDIO_SINK@", delta > 0.0);
+        if let Some(bar) = weak_out.upgrade() {
+            let v = read_volume("@DEFAULT_AUDIO_SINK@");
+            bar.set_volume_out_text(v.text.into());
+            bar.set_volume_out_muted(v.muted);
+        }
+    });
+    let weak_in = bar.as_weak();
+    bar.on_volume_in_scrolled(move |delta| {
+        if delta == 0.0 {
+            return;
+        }
+        adjust_volume("@DEFAULT_AUDIO_SOURCE@", delta > 0.0);
+        if let Some(bar) = weak_in.upgrade() {
+            let v = read_volume("@DEFAULT_AUDIO_SOURCE@");
+            bar.set_volume_in_text(v.text.into());
+            bar.set_volume_in_muted(v.muted);
+        }
+    });
 }
 
 fn setup_timers(bar: &BarWindow, cfg: &BarModuleConfig, converse_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>) -> Timers {
@@ -553,4 +583,33 @@ fn read_volume_pactl(target: &str) -> Option<VolumeInfo> {
 
 fn read_volume(target: &str) -> VolumeInfo {
     read_volume_wpctl(target).or_else(|| read_volume_pactl(target)).unwrap_or(VolumeInfo { text: "--%".into(), muted: false })
+}
+
+fn adjust_volume_wpctl(target: &str, up: bool) -> bool {
+    let step = if up { "5%+" } else { "5%-" };
+    Command::new("wpctl")
+        .args(["set-volume", "-l", "1.5", target, step])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn adjust_volume_pactl(target: &str, up: bool) -> bool {
+    let (cmd, t) = if target == "@DEFAULT_AUDIO_SINK@" {
+        ("set-sink-volume", "@DEFAULT_SINK@")
+    } else {
+        ("set-source-volume", "@DEFAULT_SOURCE@")
+    };
+    let step = if up { "+5%" } else { "-5%" };
+    Command::new("pactl")
+        .args([cmd, t, step])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn adjust_volume(target: &str, up: bool) {
+    if !adjust_volume_wpctl(target, up) {
+        let _ = adjust_volume_pactl(target, up);
+    }
 }

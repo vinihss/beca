@@ -4,29 +4,44 @@ export component VolumeWidget inherits Rectangle {
     in property <string> label: "󰕾";
     in property <string> value-text: "--%";
     in property <bool> muted: false;
+    callback scrolled(float);
 
     min-width: 56px;
     min-height: 24px;
     background: transparent;
 
-    HorizontalLayout {
-        alignment: center;
-        padding-left: 8px;
-        padding-right: 8px;
-        spacing: 4px;
-        Text {
-            text: root.muted ? "󰝟" : root.label;
-            color: root.muted ? Theme.accent-danger : Theme.accent;
-            font-family: Theme.icon-font-family;
-            font-size: 13px;
-            vertical-alignment: center;
+    TouchArea {
+        width: 100%;
+        height: 100%;
+        scroll-event(event) => {
+            if (event.delta-y != 0) {
+                root.scrolled(event.delta-y / 1px);
+                return accept;
+            }
+            reject
         }
-        Text {
-            text: root.value-text;
-            color: root.muted ? Theme.text-main.with-alpha(0.6) : Theme.text-main;
-            font-size: 12px;
-            font-weight: 600;
-            vertical-alignment: center;
+
+        HorizontalLayout {
+            width: 100%;
+            height: 100%;
+            alignment: center;
+            padding-left: 8px;
+            padding-right: 8px;
+            spacing: 4px;
+            Text {
+                text: root.muted ? "󰝟" : root.label;
+                color: root.muted ? Theme.accent-danger : Theme.accent;
+                font-family: Theme.icon-font-family;
+                font-size: 13px;
+                vertical-alignment: center;
+            }
+            Text {
+                text: root.value-text;
+                color: root.muted ? Theme.text-main.with-alpha(0.6) : Theme.text-main;
+                font-size: 12px;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
         }
     }
 }

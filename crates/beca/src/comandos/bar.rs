@@ -146,6 +146,35 @@ fn read_volume(target: &str) -> VolumeInfo {
         })
 }
 
+fn adjust_volume_wpctl(target: &str, up: bool) -> bool {
+    let step = if up { "5%+" } else { "5%-" };
+    Command::new("wpctl")
+        .args(["set-volume", "-l", "1.5", target, step])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn adjust_volume_pactl(target: &str, up: bool) -> bool {
+    let (cmd, t) = if target == "@DEFAULT_AUDIO_SINK@" {
+        ("set-sink-volume", "@DEFAULT_SINK@")
+    } else {
+        ("set-source-volume", "@DEFAULT_SOURCE@")
+    };
+    let step = if up { "+5%" } else { "-5%" };
+    Command::new("pactl")
+        .args([cmd, t, step])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn adjust_volume(target: &str, up: bool) {
+    if !adjust_volume_wpctl(target, up) {
+        let _ = adjust_volume_pactl(target, up);
+    }
+}
+
 pub fn dispatch(action: &str, args: &[String]) -> Result<()> {
     match action {
         "show-top" => show("top"),
@@ -484,8 +513,11 @@ fn dock_bar_hyprland(position: &str, height: f32, exclusive: bool) -> Option<Str
 
 pub fn show(position: &str) -> Result<()> {
     let resolved = beca_core::config::load();
-    let bar_cfg = &resolved.config.modules.bar;
+    let bar_cfg = resolved.config.modules.bar_config_for(position);
     let theme = &resolved.theme;
+    if !bar_cfg.enabled {
+        return Ok(());
+    }
 
     #[cfg(target_os = "linux")]
     {
@@ -495,7 +527,7 @@ pub fn show(position: &str) -> Result<()> {
                 "bottom" => beca_layer_shell::BarPosition::Bottom,
                 _ => beca_layer_shell::BarPosition::Top,
             };
-            match beca_layer_shell::run_bar(pos, bar_cfg, theme) {
+            match beca_layer_shell::run_bar(pos, &bar_cfg, theme) {
                 Ok(()) => return Ok(()),
                 Err(e) => {
                     eprintln!("[beca-bar] layer-shell unavailable, falling back to window mode: {e}");
@@ -618,6 +650,56 @@ pub fn show(position: &str) -> Result<()> {
                     let _ = app.set_property("conversation-active", Value::Bool(active));
                 }
             });
+            Value::Void
+        });
+    }
+
+    {
+        let weak = app.as_weak();
+        let _ = app.set_callback("volume-out-scrolled", move |args| {
+            let delta = args
+                .first()
+                .and_then(|v| match v {
+                    Value::Number(n) => Some(*n as f32),
+                    _ => None,
+                })
+                .unwrap_or(0.0);
+            if delta != 0.0 {
+                adjust_volume("@DEFAULT_AUDIO_SINK@", delta > 0.0);
+                let v = read_volume("@DEFAULT_AUDIO_SINK@");
+                let weak2 = weak.clone();
+                let _ = ui_loader::invoke_on_event_loop(move || {
+                    if let Some(app) = weak2.upgrade() {
+                        let _ = app.set_property("volume-out-text", Value::String(v.text.into()));
+                        let _ = app.set_property("volume-out-muted", Value::Bool(v.muted));
+                    }
+                });
+            }
+            Value::Void
+        });
+    }
+
+    {
+        let weak = app.as_weak();
+        let _ = app.set_callback("volume-in-scrolled", move |args| {
+            let delta = args
+                .first()
+                .and_then(|v| match v {
+                    Value::Number(n) => Some(*n as f32),
+                    _ => None,
+                })
+                .unwrap_or(0.0);
+            if delta != 0.0 {
+                adjust_volume("@DEFAULT_AUDIO_SOURCE@", delta > 0.0);
+                let v = read_volume("@DEFAULT_AUDIO_SOURCE@");
+                let weak2 = weak.clone();
+                let _ = ui_loader::invoke_on_event_loop(move || {
+                    if let Some(app) = weak2.upgrade() {
+                        let _ = app.set_property("volume-in-text", Value::String(v.text.into()));
+                        let _ = app.set_property("volume-in-muted", Value::Bool(v.muted));
+                    }
+                });
+            }
             Value::Void
         });
     }
