@@ -123,6 +123,11 @@ impl ModulesConfig {
             c.show_volume_in = false;
             c.show_launcher = false;
         }
+        if c.left.is_none() && c.center.is_none() && c.right.is_none() {
+            c.left = Some(vec!["cpu".into(), "memory".into(), "disk".into()]);
+            c.center = Some(vec!["clock".into(), "conversation".into(), "alerts".into()]);
+            c.right = Some(vec!["bluetooth".into()]);
+        }
         c
     }
 
@@ -133,6 +138,11 @@ impl ModulesConfig {
                 c.show_launcher = true;
                 c.launcher_label = self.bar.launcher_label.clone();
                 c.launcher_section = "left".into();
+            }
+            if c.left.is_none() && c.center.is_none() && c.right.is_none() {
+                c.left = Some(vec!["launcher".into()]);
+                c.center = Some(Vec::new());
+                c.right = Some(vec!["volume-out".into(), "volume-in".into(), "network".into()]);
             }
             c
         } else {
@@ -284,6 +294,12 @@ impl BarModuleConfig {
             "conversation" | "voice-live" | "voicelive" | "live" | "voice" => Some("conversation".into()),
             "volume-out" | "volume_out" | "audio-out" | "output" | "sink" => Some("volume-out".into()),
             "volume-in" | "volume_in" | "audio-in" | "input" | "source" | "mic" => Some("volume-in".into()),
+            "network" | "net" | "wifi" | "ethernet" => Some("network".into()),
+            "alerts" | "notifications" | "notif" => Some("alerts".into()),
+            "bluetooth" | "bt" => Some("bluetooth".into()),
+            "cpu" => Some("cpu".into()),
+            "memory" | "mem" | "ram" => Some("memory".into()),
+            "disk" | "storage" | "fs" => Some("disk".into()),
             _ => None,
         }
     }

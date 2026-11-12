@@ -43,6 +43,8 @@ pub enum Commands {
     Ping,
 
     Subscribe,
+
+    Restart,
 }
 
 #[derive(Subcommand)]

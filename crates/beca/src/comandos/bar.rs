@@ -612,6 +612,49 @@ pub fn show(position: &str) -> Result<()> {
         let _ = app.set_property("show-volume-in", Value::Bool(false));
     }
 
+    let show_network = find_section("network").is_some();
+    if let Some(sec) = find_section("network") {
+        let _ = app.set_property("show-network", Value::Bool(true));
+        let _ = app.set_property("network-section", Value::String(sec.into()));
+    } else {
+        let _ = app.set_property("show-network", Value::Bool(false));
+    }
+    let show_alerts = find_section("alerts").is_some();
+    if let Some(sec) = find_section("alerts") {
+        let _ = app.set_property("show-alerts", Value::Bool(true));
+        let _ = app.set_property("alerts-section", Value::String(sec.into()));
+    } else {
+        let _ = app.set_property("show-alerts", Value::Bool(false));
+    }
+    let show_bluetooth = find_section("bluetooth").is_some();
+    if let Some(sec) = find_section("bluetooth") {
+        let _ = app.set_property("show-bluetooth", Value::Bool(true));
+        let _ = app.set_property("bluetooth-section", Value::String(sec.into()));
+    } else {
+        let _ = app.set_property("show-bluetooth", Value::Bool(false));
+    }
+    let show_cpu = find_section("cpu").is_some();
+    if let Some(sec) = find_section("cpu") {
+        let _ = app.set_property("show-cpu", Value::Bool(true));
+        let _ = app.set_property("cpu-section", Value::String(sec.into()));
+    } else {
+        let _ = app.set_property("show-cpu", Value::Bool(false));
+    }
+    let show_memory = find_section("memory").is_some();
+    if let Some(sec) = find_section("memory") {
+        let _ = app.set_property("show-memory", Value::Bool(true));
+        let _ = app.set_property("memory-section", Value::String(sec.into()));
+    } else {
+        let _ = app.set_property("show-memory", Value::Bool(false));
+    }
+    let show_disk = find_section("disk").is_some();
+    if let Some(sec) = find_section("disk") {
+        let _ = app.set_property("show-disk", Value::Bool(true));
+        let _ = app.set_property("disk-section", Value::String(sec.into()));
+    } else {
+        let _ = app.set_property("show-disk", Value::Bool(false));
+    }
+
     let _ = app.set_property(
         "launcher-label",
         Value::String(bar_cfg.launcher_label.clone().into()),
@@ -649,6 +692,12 @@ pub fn show(position: &str) -> Result<()> {
         let _ = app.set_property("volume-in-text", Value::String(v.text.into()));
         let _ = app.set_property("volume-in-muted", Value::Bool(v.muted));
     }
+    if show_network { let _ = app.set_property("network-text", Value::String(read_network().into())); }
+    if show_alerts { let _ = app.set_property("alerts-text", Value::String(read_alerts().into())); }
+    if show_bluetooth { let _ = app.set_property("bluetooth-text", Value::String(read_bluetooth().into())); }
+    if show_cpu { let _ = app.set_property("cpu-text", Value::String(read_cpu().into())); }
+    if show_memory { let _ = app.set_property("memory-text", Value::String(read_memory().into())); }
+    if show_disk { let _ = app.set_property("disk-text", Value::String(read_disk().into())); }
 
     let _ = app.set_callback("launcher-clicked", |_args| {
         let exe = std::env::current_exe()
@@ -826,6 +875,33 @@ pub fn show(position: &str) -> Result<()> {
         });
     }
 
+    if show_network || show_alerts || show_bluetooth || show_cpu || show_memory || show_disk {
+        let running_flag = running.clone();
+        let weak_stats = app.as_weak();
+        thread::spawn(move || {
+            while running_flag.load(Ordering::Relaxed) {
+                let net = if show_network { Some(read_network()) } else { None };
+                let al = if show_alerts { Some(read_alerts()) } else { None };
+                let bt = if show_bluetooth { Some(read_bluetooth()) } else { None };
+                let cpu = if show_cpu { Some(read_cpu()) } else { None };
+                let mem = if show_memory { Some(read_memory()) } else { None };
+                let disk = if show_disk { Some(read_disk()) } else { None };
+                let weak2 = weak_stats.clone();
+                let _ = ui_loader::invoke_on_event_loop(move || {
+                    if let Some(app) = weak2.upgrade() {
+                        if let Some(v) = net { let _ = app.set_property("network-text", Value::String(v.into())); }
+                        if let Some(v) = al { let _ = app.set_property("alerts-text", Value::String(v.into())); }
+                        if let Some(v) = bt { let _ = app.set_property("bluetooth-text", Value::String(v.into())); }
+                        if let Some(v) = cpu { let _ = app.set_property("cpu-text", Value::String(v.into())); }
+                        if let Some(v) = mem { let _ = app.set_property("memory-text", Value::String(v.into())); }
+                        if let Some(v) = disk { let _ = app.set_property("disk-text", Value::String(v.into())); }
+                    }
+                });
+                thread::sleep(Duration::from_secs(3));
+            }
+        });
+    }
+
     let pos = position.to_string();
     let dock_h = bar_cfg.height;
     let exclusive = bar_cfg.exclusive;
@@ -854,4 +930,128 @@ pub fn show(position: &str) -> Result<()> {
         }
     }
     Ok(())
+}
+
+
+fn read_network() -> String {
+    let out = Command::new("nmcli").args(["-t", "-f", "TYPE,STATE,CONNECTION", "device"]).output();
+    if let Ok(o) = out {
+        if o.status.success() {
+            let s = String::from_utf8_lossy(&o.stdout);
+            for line in s.lines() {
+                let parts: Vec<&str> = line.split(':').collect();
+                if parts.len() >= 3 && parts[1] == "connected" {
+                    let name = parts[2];
+                    if !name.is_empty() && name != "--" {
+                        let short = if name.chars().count() > 12 { name.chars().take(12).collect::<String>() + "…" } else { name.to_string() };
+                        return short;
+                    }
+                }
+            }
+            for line in s.lines() {
+                let parts: Vec<&str> = line.split(':').collect();
+                if parts.len() >= 2 && parts[1] == "connected" { return "on".into(); }
+            }
+        }
+    }
+    let out = Command::new("ip").args(["-o", "link", "show", "up"]).output();
+    if let Ok(o) = out {
+        if o.status.success() {
+            let s = String::from_utf8_lossy(&o.stdout);
+            if s.lines().any(|l| !l.contains("lo:")) { return "on".into(); }
+        }
+    }
+    "off".into()
+}
+
+fn read_bluetooth() -> String {
+    let out = Command::new("bluetoothctl").args(["show"]).output();
+    if let Ok(o) = out {
+        if o.status.success() {
+            let s = String::from_utf8_lossy(&o.stdout);
+            let powered = s.lines().any(|l| l.trim() == "Powered: yes");
+            if !powered { return "off".into(); }
+            if let Ok(dev) = Command::new("bluetoothctl").args(["devices", "Connected"]).output() {
+                let ds = String::from_utf8_lossy(&dev.stdout);
+                let count = ds.lines().filter(|l| !l.trim().is_empty()).count();
+                if count > 0 { return format!("{count}"); }
+            }
+            return "on".into();
+        }
+    }
+    "--".into()
+}
+
+fn read_alerts() -> String {
+    if let Ok(o) = Command::new("swaync-client").args(["-c"]).output() {
+        if o.status.success() {
+            let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            if !s.is_empty() { return s; }
+        }
+    }
+    if let Ok(o) = Command::new("makoctl").arg("list").output() {
+        if o.status.success() {
+            let s = String::from_utf8_lossy(&o.stdout);
+            let count = s.matches("\n\n").count() + if s.trim().is_empty() { 0 } else { 1 };
+            return count.to_string();
+        }
+    }
+    if let Ok(o) = Command::new("dunstctl").args(["count", "displayed"]).output() {
+        if o.status.success() {
+            let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            if !s.is_empty() { return s; }
+        }
+    }
+    "0".into()
+}
+
+fn read_cpu() -> String {
+    static PREV: std::sync::OnceLock<std::sync::Mutex<(u64, u64)>> = std::sync::OnceLock::new();
+    let lock = PREV.get_or_init(|| std::sync::Mutex::new((0, 0)));
+    let Ok(content) = std::fs::read_to_string("/proc/stat") else { return "--%".into(); };
+    let Some(line) = content.lines().next() else { return "--%".into(); };
+    let nums: Vec<u64> = line.split_whitespace().skip(1).filter_map(|n| n.parse().ok()).collect();
+    if nums.len() < 4 { return "--%".into(); }
+    let idle = nums.get(3).copied().unwrap_or(0) + nums.get(4).copied().unwrap_or(0);
+    let total: u64 = nums.iter().sum();
+    let mut prev = match lock.lock() { Ok(g) => g, Err(_) => return "--%".into() };
+    let (pt, pi) = *prev;
+    *prev = (total, idle);
+    if pt == 0 || total <= pt { return "--%".into(); }
+    let dt = total - pt;
+    let di = idle.saturating_sub(pi);
+    let usage = ((dt.saturating_sub(di)) as f64 / dt as f64 * 100.0).round().clamp(0.0, 100.0) as i64;
+    format!("{usage}%")
+}
+
+fn read_memory() -> String {
+    let Ok(content) = std::fs::read_to_string("/proc/meminfo") else { return "--%".into(); };
+    let mut total: u64 = 0;
+    let mut avail: u64 = 0;
+    for line in content.lines() {
+        if line.starts_with("MemTotal:") {
+            total = line.split_whitespace().nth(1).and_then(|v| v.parse().ok()).unwrap_or(0);
+        } else if line.starts_with("MemAvailable:") {
+            avail = line.split_whitespace().nth(1).and_then(|v| v.parse().ok()).unwrap_or(0);
+        }
+    }
+    if total == 0 { return "--%".into(); }
+    let used = total.saturating_sub(avail);
+    let pct = (used as f64 / total as f64 * 100.0).round().clamp(0.0, 100.0) as i64;
+    format!("{pct}%")
+}
+
+fn read_disk() -> String {
+    let out = Command::new("df").args(["-h", "/"]).output();
+    if let Ok(o) = out {
+        if o.status.success() {
+            let s = String::from_utf8_lossy(&o.stdout);
+            if let Some(line) = s.lines().nth(1) {
+                if let Some(pct) = line.split_whitespace().nth(4) {
+                    return pct.to_string();
+                }
+            }
+        }
+    }
+    "--%".into()
 }

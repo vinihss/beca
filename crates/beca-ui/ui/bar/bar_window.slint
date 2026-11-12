@@ -3,6 +3,7 @@ import { ClockWidget } from "./clock_widget.slint";
 import { LauncherWidget } from "./launcher_widget.slint";
 import { VolumeWidget } from "./volume_widget.slint";
 import { ConversationWidget } from "./conversation_widget.slint";
+import { InfoWidget } from "./info_widget.slint";
 
 export component BarWindow inherits Window {
     in-out property <string> position: "top";
@@ -18,12 +19,30 @@ export component BarWindow inherits Window {
     in-out property <bool> volume-in-muted: false;
     in-out property <bool> show-conversation: true;
     in-out property <bool> conversation-active: false;
+    in-out property <bool> show-network: false;
+    in-out property <string> network-text: "--";
+    in-out property <bool> show-alerts: false;
+    in-out property <string> alerts-text: "0";
+    in-out property <bool> show-bluetooth: false;
+    in-out property <string> bluetooth-text: "--";
+    in-out property <bool> show-cpu: false;
+    in-out property <string> cpu-text: "--%";
+    in-out property <bool> show-memory: false;
+    in-out property <string> memory-text: "--%";
+    in-out property <bool> show-disk: false;
+    in-out property <string> disk-text: "--%";
 
     in-out property <string> clock-section: "center";
     in-out property <string> launcher-section: "left";
     in-out property <string> volume-out-section: "right";
     in-out property <string> volume-in-section: "right";
     in-out property <string> conversation-section: "center";
+    in-out property <string> network-section: "right";
+    in-out property <string> alerts-section: "center";
+    in-out property <string> bluetooth-section: "right";
+    in-out property <string> cpu-section: "left";
+    in-out property <string> memory-section: "left";
+    in-out property <string> disk-section: "left";
 
     in-out property <string> left-align: "start";
     in-out property <string> center-align: "center";
@@ -98,6 +117,30 @@ export component BarWindow inherits Window {
                         value-text: root.volume-in-text;
                         muted: root.volume-in-muted;
                         scrolled(delta) => { root.volume-in-scrolled(delta); }
+                    }
+                    if root.show-network && root.network-section == section : InfoWidget {
+                        icon: "󰖩";
+                        text: root.network-text;
+                    }
+                    if root.show-alerts && root.alerts-section == section : InfoWidget {
+                        icon: "󰂚";
+                        text: root.alerts-text;
+                    }
+                    if root.show-bluetooth && root.bluetooth-section == section : InfoWidget {
+                        icon: "󰂯";
+                        text: root.bluetooth-text;
+                    }
+                    if root.show-cpu && root.cpu-section == section : InfoWidget {
+                        icon: "󰍛";
+                        text: root.cpu-text;
+                    }
+                    if root.show-memory && root.memory-section == section : InfoWidget {
+                        icon: "󰘚";
+                        text: root.memory-text;
+                    }
+                    if root.show-disk && root.disk-section == section : InfoWidget {
+                        icon: "󰋊";
+                        text: root.disk-text;
                     }
                 }
             }

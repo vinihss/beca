@@ -1,0 +1,33 @@
+import { Theme } from "../theme.slint";
+
+export component InfoWidget inherits Rectangle {
+    in property <string> icon: "";
+    in property <string> text: "--";
+    in property <color> icon-color: Theme.accent;
+    in property <color> text-color: Theme.text-main;
+
+    min-width: 44px;
+    min-height: 24px;
+    background: transparent;
+
+    HorizontalLayout {
+        alignment: center;
+        padding-left: 6px;
+        padding-right: 6px;
+        spacing: 4px;
+        if root.icon != "" : Text {
+            text: root.icon;
+            color: root.icon-color;
+            font-family: Theme.icon-font-family;
+            font-size: 12px;
+            vertical-alignment: center;
+        }
+        Text {
+            text: root.text;
+            color: root.text-color;
+            font-size: 12px;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+    }
+}

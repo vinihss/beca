@@ -129,6 +129,7 @@ struct Timers {
     _clock: Option<Timer>,
     _volume: Option<Timer>,
     _converse: Option<Timer>,
+    _stats: Option<Timer>,
 }
 
 struct BarInstance {
@@ -427,6 +428,42 @@ fn configure_bar(bar: &BarWindow, cfg: &BarModuleConfig, position: BarPosition) 
     } else {
         bar.set_show_volume_in(false);
     }
+    if let Some(sec) = find_section("network") {
+        bar.set_show_network(true);
+        bar.set_network_section(sec.into());
+    } else {
+        bar.set_show_network(false);
+    }
+    if let Some(sec) = find_section("alerts") {
+        bar.set_show_alerts(true);
+        bar.set_alerts_section(sec.into());
+    } else {
+        bar.set_show_alerts(false);
+    }
+    if let Some(sec) = find_section("bluetooth") {
+        bar.set_show_bluetooth(true);
+        bar.set_bluetooth_section(sec.into());
+    } else {
+        bar.set_show_bluetooth(false);
+    }
+    if let Some(sec) = find_section("cpu") {
+        bar.set_show_cpu(true);
+        bar.set_cpu_section(sec.into());
+    } else {
+        bar.set_show_cpu(false);
+    }
+    if let Some(sec) = find_section("memory") {
+        bar.set_show_memory(true);
+        bar.set_memory_section(sec.into());
+    } else {
+        bar.set_show_memory(false);
+    }
+    if let Some(sec) = find_section("disk") {
+        bar.set_show_disk(true);
+        bar.set_disk_section(sec.into());
+    } else {
+        bar.set_show_disk(false);
+    }
 
     bar.set_launcher_label(cfg.launcher_label.clone().into());
     bar.set_conversation_active(false);
@@ -441,6 +478,12 @@ fn configure_bar(bar: &BarWindow, cfg: &BarModuleConfig, position: BarPosition) 
     bar.set_clock_text(format_clock(&cfg.clock_format).into());
     if bar.get_show_volume_out() { let v = read_volume("@DEFAULT_AUDIO_SINK@"); bar.set_volume_out_text(v.text.into()); bar.set_volume_out_muted(v.muted); }
     if bar.get_show_volume_in() { let v = read_volume("@DEFAULT_AUDIO_SOURCE@"); bar.set_volume_in_text(v.text.into()); bar.set_volume_in_muted(v.muted); }
+    if bar.get_show_network() { bar.set_network_text(read_network().into()); }
+    if bar.get_show_alerts() { bar.set_alerts_text(read_alerts().into()); }
+    if bar.get_show_bluetooth() { bar.set_bluetooth_text(read_bluetooth().into()); }
+    if bar.get_show_cpu() { bar.set_cpu_text(read_cpu().into()); }
+    if bar.get_show_memory() { bar.set_memory_text(read_memory().into()); }
+    if bar.get_show_disk() { bar.set_disk_text(read_disk().into()); }
 }
 
 fn converse_spawn_or_signal(slot: &std::sync::Arc<Mutex<Option<std::process::Child>>>) -> bool {
@@ -585,7 +628,31 @@ fn setup_timers(bar: &BarWindow, cfg: &BarModuleConfig, converse_slot: std::sync
         Some(timer)
     };
 
-    Timers { _clock: clock, _volume: volume, _converse: converse }
+    let stats_needed = bar.get_show_network() || bar.get_show_alerts() || bar.get_show_bluetooth()
+        || bar.get_show_cpu() || bar.get_show_memory() || bar.get_show_disk();
+    let stats = if stats_needed {
+        let weak = bar.as_weak();
+        let net = bar.get_show_network();
+        let alerts = bar.get_show_alerts();
+        let bt = bar.get_show_bluetooth();
+        let cpu = bar.get_show_cpu();
+        let mem = bar.get_show_memory();
+        let disk = bar.get_show_disk();
+        let timer = Timer::default();
+        timer.start(TimerMode::Repeated, Duration::from_secs(3), move || {
+            if let Some(bar) = weak.upgrade() {
+                if net { bar.set_network_text(read_network().into()); }
+                if alerts { bar.set_alerts_text(read_alerts().into()); }
+                if bt { bar.set_bluetooth_text(read_bluetooth().into()); }
+                if cpu { bar.set_cpu_text(read_cpu().into()); }
+                if mem { bar.set_memory_text(read_memory().into()); }
+                if disk { bar.set_disk_text(read_disk().into()); }
+            }
+        });
+        Some(timer)
+    } else { None };
+
+    Timers { _clock: clock, _volume: volume, _converse: converse, _stats: stats }
 }
 
 fn format_clock(format: &str) -> String {
@@ -650,4 +717,127 @@ fn adjust_volume(target: &str, up: bool) {
     if !adjust_volume_wpctl(target, up) {
         let _ = adjust_volume_pactl(target, up);
     }
+}
+
+fn read_network() -> String {
+    let out = Command::new("nmcli").args(["-t", "-f", "TYPE,STATE,CONNECTION", "device"]).output();
+    if let Ok(o) = out {
+        if o.status.success() {
+            let s = String::from_utf8_lossy(&o.stdout);
+            for line in s.lines() {
+                let parts: Vec<&str> = line.split(':').collect();
+                if parts.len() >= 3 && parts[1] == "connected" {
+                    let name = parts[2];
+                    if !name.is_empty() && name != "--" {
+                        let short = if name.chars().count() > 12 { name.chars().take(12).collect::<String>() + "…" } else { name.to_string() };
+                        return short;
+                    }
+                }
+            }
+            for line in s.lines() {
+                let parts: Vec<&str> = line.split(':').collect();
+                if parts.len() >= 2 && parts[1] == "connected" { return "on".into(); }
+            }
+        }
+    }
+    let out = Command::new("ip").args(["-o", "link", "show", "up"]).output();
+    if let Ok(o) = out {
+        if o.status.success() {
+            let s = String::from_utf8_lossy(&o.stdout);
+            if s.lines().any(|l| !l.contains("lo:")) { return "on".into(); }
+        }
+    }
+    "off".into()
+}
+
+fn read_bluetooth() -> String {
+    let out = Command::new("bluetoothctl").args(["show"]).output();
+    if let Ok(o) = out {
+        if o.status.success() {
+            let s = String::from_utf8_lossy(&o.stdout);
+            let powered = s.lines().any(|l| l.trim() == "Powered: yes");
+            if !powered { return "off".into(); }
+            if let Ok(dev) = Command::new("bluetoothctl").args(["devices", "Connected"]).output() {
+                let ds = String::from_utf8_lossy(&dev.stdout);
+                let count = ds.lines().filter(|l| !l.trim().is_empty()).count();
+                if count > 0 { return format!("{count}"); }
+            }
+            return "on".into();
+        }
+    }
+    "--".into()
+}
+
+fn read_alerts() -> String {
+    if let Ok(o) = Command::new("swaync-client").args(["-c"]).output() {
+        if o.status.success() {
+            let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            if !s.is_empty() { return s; }
+        }
+    }
+    if let Ok(o) = Command::new("makoctl").arg("list").output() {
+        if o.status.success() {
+            let s = String::from_utf8_lossy(&o.stdout);
+            let count = s.matches("\n\n").count() + if s.trim().is_empty() { 0 } else { 1 };
+            return count.to_string();
+        }
+    }
+    if let Ok(o) = Command::new("dunstctl").args(["count", "displayed"]).output() {
+        if o.status.success() {
+            let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            if !s.is_empty() { return s; }
+        }
+    }
+    "0".into()
+}
+
+fn read_cpu() -> String {
+    static PREV: std::sync::OnceLock<std::sync::Mutex<(u64, u64)>> = std::sync::OnceLock::new();
+    let lock = PREV.get_or_init(|| std::sync::Mutex::new((0, 0)));
+    let Ok(content) = std::fs::read_to_string("/proc/stat") else { return "--%".into(); };
+    let Some(line) = content.lines().next() else { return "--%".into(); };
+    let nums: Vec<u64> = line.split_whitespace().skip(1).filter_map(|n| n.parse().ok()).collect();
+    if nums.len() < 4 { return "--%".into(); }
+    let idle = nums.get(3).copied().unwrap_or(0) + nums.get(4).copied().unwrap_or(0);
+    let total: u64 = nums.iter().sum();
+    let mut prev = match lock.lock() { Ok(g) => g, Err(_) => return "--%".into() };
+    let (pt, pi) = *prev;
+    *prev = (total, idle);
+    if pt == 0 || total <= pt { return "--%".into(); }
+    let dt = total - pt;
+    let di = idle.saturating_sub(pi);
+    let usage = ((dt.saturating_sub(di)) as f64 / dt as f64 * 100.0).round().clamp(0.0, 100.0) as i64;
+    format!("{usage}%")
+}
+
+fn read_memory() -> String {
+    let Ok(content) = std::fs::read_to_string("/proc/meminfo") else { return "--%".into(); };
+    let mut total: u64 = 0;
+    let mut avail: u64 = 0;
+    for line in content.lines() {
+        if line.starts_with("MemTotal:") {
+            total = line.split_whitespace().nth(1).and_then(|v| v.parse().ok()).unwrap_or(0);
+        } else if line.starts_with("MemAvailable:") {
+            avail = line.split_whitespace().nth(1).and_then(|v| v.parse().ok()).unwrap_or(0);
+        }
+    }
+    if total == 0 { return "--%".into(); }
+    let used = total.saturating_sub(avail);
+    let pct = (used as f64 / total as f64 * 100.0).round().clamp(0.0, 100.0) as i64;
+    format!("{pct}%")
+}
+
+fn read_disk() -> String {
+    let out = Command::new("df").args(["-h", "/"]).output();
+    if let Ok(o) = out {
+        if o.status.success() {
+            let s = String::from_utf8_lossy(&o.stdout);
+            if let Some(line) = s.lines().nth(1) {
+                if let Some(pct) = line.split_whitespace().nth(4) {
+                    return pct.to_string();
+                }
+            }
+        }
+    }
+    "--%".into()
 }
