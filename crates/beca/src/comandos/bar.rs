@@ -565,36 +565,56 @@ pub fn show(position: &str) -> Result<()> {
     let app = ui_loader::create("BarWindow").map_err(|e| anyhow::anyhow!(e))?;
     ui_loader::apply_theme_global(&app, &theme);
 
+    let (left_l, center_l, right_l) = bar_cfg.resolved_layout();
+    let find_section = |name: &str| -> Option<String> {
+        if left_l.iter().any(|w| w == name) {
+            Some("left".into())
+        } else if right_l.iter().any(|w| w == name) {
+            Some("right".into())
+        } else if center_l.iter().any(|w| w == name) {
+            Some("center".into())
+        } else {
+            None
+        }
+    };
+
     let _ = app.set_property("position", Value::String(position.into()));
-    let _ = app.set_property("show-clock", Value::Bool(bar_cfg.show_clock));
-    let _ = app.set_property("show-launcher", Value::Bool(bar_cfg.show_launcher));
+    if let Some(sec) = find_section("clock") {
+        let _ = app.set_property("show-clock", Value::Bool(true));
+        let _ = app.set_property("clock-section", Value::String(sec.into()));
+    } else {
+        let _ = app.set_property("show-clock", Value::Bool(false));
+    }
+    if let Some(sec) = find_section("launcher") {
+        let _ = app.set_property("show-launcher", Value::Bool(true));
+        let _ = app.set_property("launcher-section", Value::String(sec.into()));
+    } else {
+        let _ = app.set_property("show-launcher", Value::Bool(false));
+    }
+    if let Some(sec) = find_section("conversation") {
+        let _ = app.set_property("show-conversation", Value::Bool(true));
+        let _ = app.set_property("conversation-section", Value::String(sec.into()));
+    } else {
+        let _ = app.set_property("show-conversation", Value::Bool(false));
+    }
+    let show_volume_out = find_section("volume-out").is_some();
+    if let Some(sec) = find_section("volume-out") {
+        let _ = app.set_property("show-volume-out", Value::Bool(true));
+        let _ = app.set_property("volume-out-section", Value::String(sec.into()));
+    } else {
+        let _ = app.set_property("show-volume-out", Value::Bool(false));
+    }
+    let show_volume_in = find_section("volume-in").is_some();
+    if let Some(sec) = find_section("volume-in") {
+        let _ = app.set_property("show-volume-in", Value::Bool(true));
+        let _ = app.set_property("volume-in-section", Value::String(sec.into()));
+    } else {
+        let _ = app.set_property("show-volume-in", Value::Bool(false));
+    }
+
     let _ = app.set_property(
         "launcher-label",
         Value::String(bar_cfg.launcher_label.clone().into()),
-    );
-    let _ = app.set_property("show-volume-out", Value::Bool(bar_cfg.show_volume_out));
-    let _ = app.set_property("show-volume-in", Value::Bool(bar_cfg.show_volume_in));
-    let _ = app.set_property("show-conversation", Value::Bool(bar_cfg.show_voice));
-
-    let _ = app.set_property(
-        "clock-section",
-        Value::String(bar_cfg.clock_section.clone().into()),
-    );
-    let _ = app.set_property(
-        "launcher-section",
-        Value::String(bar_cfg.launcher_section.clone().into()),
-    );
-    let _ = app.set_property(
-        "volume-out-section",
-        Value::String(bar_cfg.volume_out_section.clone().into()),
-    );
-    let _ = app.set_property(
-        "volume-in-section",
-        Value::String(bar_cfg.volume_in_section.clone().into()),
-    );
-    let _ = app.set_property(
-        "conversation-section",
-        Value::String(bar_cfg.voice_section.clone().into()),
     );
     let _ = app.set_property(
         "left-align",
@@ -613,15 +633,18 @@ pub fn show(position: &str) -> Result<()> {
         Value::Number(bar_cfg.background_opacity as f64),
     );
     let _ = app.set_property("show-border", Value::Bool(bar_cfg.show_border));
+    if let Some(color) = bar_cfg.background.as_ref().and_then(|s| beca_ui::theme::parse_color(s)) {
+        let _ = app.set_property("bar-background", Value::Brush(color.into()));
+    }
 
     let initial = format_clock(&bar_cfg.clock_format);
     let _ = app.set_property("clock-text", Value::String(initial.into()));
-    if bar_cfg.show_volume_out {
+    if show_volume_out {
         let v = read_volume("@DEFAULT_AUDIO_SINK@");
         let _ = app.set_property("volume-out-text", Value::String(v.text.into()));
         let _ = app.set_property("volume-out-muted", Value::Bool(v.muted));
     }
-    if bar_cfg.show_volume_in {
+    if show_volume_in {
         let v = read_volume("@DEFAULT_AUDIO_SOURCE@");
         let _ = app.set_property("volume-in-text", Value::String(v.text.into()));
         let _ = app.set_property("volume-in-muted", Value::Bool(v.muted));

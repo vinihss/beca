@@ -30,6 +30,7 @@ export component BarWindow inherits Window {
     in-out property <string> right-align: "end";
     in-out property <float> background-opacity: 1.0;
     in-out property <bool> show-border: false;
+    in-out property <brush> bar-background: Theme.card-bg;
     callback launcher-clicked();
     callback conversation-clicked();
     callback volume-out-scrolled(float);
@@ -54,7 +55,7 @@ export component BarWindow inherits Window {
     Rectangle {
         width: 100%;
         height: 100%;
-        background: Theme.card-bg.with-alpha(root.background-opacity);
+        background: root.bar-background.with-alpha(root.background-opacity);
         border-radius: 0px;
 
         HorizontalLayout {

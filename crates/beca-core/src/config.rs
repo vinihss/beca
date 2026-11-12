@@ -95,7 +95,21 @@ impl Default for ModulesConfig {
 
 impl ModulesConfig {
     pub fn effective_bottom_bar(&self) -> BarModuleConfig {
-        self.bar_bottom.clone().unwrap_or_else(BarModuleConfig::default_bottom)
+        if let Some(mut b) = self.bar_bottom.clone() {
+            if b.background.is_none() {
+                b.background = self.bar.background.clone();
+            }
+            if (b.background_opacity - 1.0).abs() < f32::EPSILON && self.bar.background_opacity < 1.0 {
+                b.background_opacity = self.bar.background_opacity;
+            }
+            b
+        } else {
+            let mut b = BarModuleConfig::default_bottom();
+            b.background = self.bar.background.clone();
+            b.background_opacity = self.bar.background_opacity;
+            b.show_border = self.bar.show_border;
+            b
+        }
     }
 
     pub fn bottom_bar_enabled(&self) -> bool {
@@ -107,13 +121,20 @@ impl ModulesConfig {
         if self.bottom_bar_enabled() {
             c.show_volume_out = false;
             c.show_volume_in = false;
+            c.show_launcher = false;
         }
         c
     }
 
     pub fn bar_config_for(&self, position: &str) -> BarModuleConfig {
         if position == "bottom" {
-            self.effective_bottom_bar()
+            let mut c = self.effective_bottom_bar();
+            if self.bottom_bar_enabled() && self.bar_bottom.as_ref().is_none() {
+                c.show_launcher = true;
+                c.launcher_label = self.bar.launcher_label.clone();
+                c.launcher_section = "left".into();
+            }
+            c
         } else {
             self.effective_top_bar()
         }
@@ -145,6 +166,9 @@ pub struct BarModuleConfig {
     #[serde(alias = "border", alias = "show-border")]
     pub show_border: bool,
 
+    #[serde(alias = "background-color", alias = "background_color", alias = "bar-background")]
+    pub background: Option<String>,
+
     pub show_volume_out: bool,
     pub show_volume_in: bool,
     pub volume_out_section: String,
@@ -153,6 +177,10 @@ pub struct BarModuleConfig {
     pub show_voice: bool,
     pub voice_label: String,
     pub voice_section: String,
+
+    pub left: Option<Vec<String>>,
+    pub center: Option<Vec<String>>,
+    pub right: Option<Vec<String>>,
 }
 
 impl Default for BarModuleConfig {
@@ -172,6 +200,7 @@ impl Default for BarModuleConfig {
             right_align: "end".into(),
             background_opacity: 1.0,
             show_border: false,
+            background: None,
             show_volume_out: true,
             show_volume_in: true,
             volume_out_section: "right".into(),
@@ -179,6 +208,9 @@ impl Default for BarModuleConfig {
             show_voice: true,
             voice_label: "Voice".into(),
             voice_section: "center".into(),
+            left: None,
+            center: None,
+            right: None,
         }
     }
 }
@@ -200,6 +232,7 @@ impl BarModuleConfig {
             right_align: "end".into(),
             background_opacity: 1.0,
             show_border: false,
+            background: None,
             show_volume_out: true,
             show_volume_in: true,
             volume_out_section: "right".into(),
@@ -207,6 +240,51 @@ impl BarModuleConfig {
             show_voice: false,
             voice_label: "Voice".into(),
             voice_section: "center".into(),
+            left: None,
+            center: None,
+            right: None,
+        }
+    }
+
+    pub fn resolved_layout(&self) -> (Vec<String>, Vec<String>, Vec<String>) {
+        if self.left.is_some() || self.center.is_some() || self.right.is_some() {
+            let norm = |items: &Option<Vec<String>>| -> Vec<String> {
+                items
+                    .as_ref()
+                    .map(|v| v.iter().filter_map(|s| Self::normalize_widget(s)).collect())
+                    .unwrap_or_default()
+            };
+            return (norm(&self.left), norm(&self.center), norm(&self.right));
+        }
+        let mut left = Vec::new();
+        let mut center = Vec::new();
+        let mut right = Vec::new();
+        let mut push = |name: &str, show: bool, section: &str| {
+            if !show {
+                return;
+            }
+            match section {
+                "left" => left.push(name.to_string()),
+                "right" => right.push(name.to_string()),
+                _ => center.push(name.to_string()),
+            }
+        };
+        push("launcher", self.show_launcher, &self.launcher_section);
+        push("clock", self.show_clock, &self.clock_section);
+        push("conversation", self.show_voice, &self.voice_section);
+        push("volume-out", self.show_volume_out, &self.volume_out_section);
+        push("volume-in", self.show_volume_in, &self.volume_in_section);
+        (left, center, right)
+    }
+
+    fn normalize_widget(name: &str) -> Option<String> {
+        match name.trim().to_ascii_lowercase().as_str() {
+            "launcher" | "apps" | "app" => Some("launcher".into()),
+            "clock" | "time" => Some("clock".into()),
+            "conversation" | "voice-live" | "voicelive" | "live" | "voice" => Some("conversation".into()),
+            "volume-out" | "volume_out" | "audio-out" | "output" | "sink" => Some("volume-out".into()),
+            "volume-in" | "volume_in" | "audio-in" | "input" | "source" | "mic" => Some("volume-in".into()),
+            _ => None,
         }
     }
 }

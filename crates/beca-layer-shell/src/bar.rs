@@ -382,27 +382,65 @@ fn apply_theme(bar: &BarWindow, theme: &BecaTheme) {
 }
 
 fn configure_bar(bar: &BarWindow, cfg: &BarModuleConfig, position: BarPosition) {
+    let (left, center, right) = cfg.resolved_layout();
+    let find_section = |name: &str| -> Option<String> {
+        if left.iter().any(|w| w == name) {
+            Some("left".into())
+        } else if right.iter().any(|w| w == name) {
+            Some("right".into())
+        } else if center.iter().any(|w| w == name) {
+            Some("center".into())
+        } else {
+            None
+        }
+    };
+
     bar.set_position(match position { BarPosition::Top => "top".into(), BarPosition::Bottom => "bottom".into() });
-    bar.set_show_clock(cfg.show_clock);
-    bar.set_show_launcher(cfg.show_launcher);
+
+    if let Some(sec) = find_section("clock") {
+        bar.set_show_clock(true);
+        bar.set_clock_section(sec.into());
+    } else {
+        bar.set_show_clock(false);
+    }
+    if let Some(sec) = find_section("launcher") {
+        bar.set_show_launcher(true);
+        bar.set_launcher_section(sec.into());
+    } else {
+        bar.set_show_launcher(false);
+    }
+    if let Some(sec) = find_section("conversation") {
+        bar.set_show_conversation(true);
+        bar.set_conversation_section(sec.into());
+    } else {
+        bar.set_show_conversation(false);
+    }
+    if let Some(sec) = find_section("volume-out") {
+        bar.set_show_volume_out(true);
+        bar.set_volume_out_section(sec.into());
+    } else {
+        bar.set_show_volume_out(false);
+    }
+    if let Some(sec) = find_section("volume-in") {
+        bar.set_show_volume_in(true);
+        bar.set_volume_in_section(sec.into());
+    } else {
+        bar.set_show_volume_in(false);
+    }
+
     bar.set_launcher_label(cfg.launcher_label.clone().into());
-    bar.set_show_volume_out(cfg.show_volume_out);
-    bar.set_show_volume_in(cfg.show_volume_in);
-    bar.set_show_conversation(cfg.show_voice);
-    bar.set_clock_section(cfg.clock_section.clone().into());
-    bar.set_launcher_section(cfg.launcher_section.clone().into());
-    bar.set_volume_out_section(cfg.volume_out_section.clone().into());
-    bar.set_volume_in_section(cfg.volume_in_section.clone().into());
-    bar.set_conversation_section(cfg.voice_section.clone().into());
     bar.set_conversation_active(false);
     bar.set_left_align(cfg.left_align.clone().into());
     bar.set_center_align(cfg.center_align.clone().into());
     bar.set_right_align(cfg.right_align.clone().into());
     bar.set_background_opacity(cfg.background_opacity);
     bar.set_show_border(cfg.show_border);
+    if let Some(bg) = cfg.background.as_ref().and_then(|s| beca_ui::theme::parse_color(s)) {
+        bar.set_bar_background(slint::Brush::SolidColor(bg));
+    }
     bar.set_clock_text(format_clock(&cfg.clock_format).into());
-    if cfg.show_volume_out { let v = read_volume("@DEFAULT_AUDIO_SINK@"); bar.set_volume_out_text(v.text.into()); bar.set_volume_out_muted(v.muted); }
-    if cfg.show_volume_in { let v = read_volume("@DEFAULT_AUDIO_SOURCE@"); bar.set_volume_in_text(v.text.into()); bar.set_volume_in_muted(v.muted); }
+    if bar.get_show_volume_out() { let v = read_volume("@DEFAULT_AUDIO_SINK@"); bar.set_volume_out_text(v.text.into()); bar.set_volume_out_muted(v.muted); }
+    if bar.get_show_volume_in() { let v = read_volume("@DEFAULT_AUDIO_SOURCE@"); bar.set_volume_in_text(v.text.into()); bar.set_volume_in_muted(v.muted); }
 }
 
 fn converse_spawn_or_signal(slot: &std::sync::Arc<Mutex<Option<std::process::Child>>>) -> bool {
