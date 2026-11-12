@@ -179,6 +179,7 @@ fn run_launcher(resident: bool) -> Result<()> {
                         }
                         if let Some(w) = weak_results.upgrade() {
                             w.set_results(ModelRc::new(VecModel::from(results)));
+                            w.set_selected_index(0);
                         }
                     }
                     Ok(())
@@ -189,7 +190,10 @@ fn run_launcher(resident: bool) -> Result<()> {
             search.set(
                 "show",
                 lua.create_function(move |_, ()| {
-
+                    if let Some(w) = weak_show.upgrade() {
+                        w.set_query("".into());
+                        w.set_selected_index(0);
+                    }
                     if let Some(search) = slot_show.borrow().clone() {
                         if let Ok(cb) = search.get::<Function>("on_search") {
                             let _ = cb.call::<()>(String::new());
@@ -260,12 +264,14 @@ fn run_launcher(resident: bool) -> Result<()> {
         });
     }
 
+    let (nav_tx, nav_rx) = mpsc::channel::<i32>();
+
     if resident {
 
         window
             .window()
             .on_close_requested(|| slint::CloseRequestResponse::HideWindow);
-        start_control_listener(&window, search_slot.clone(), quit.clone())?;
+        start_control_listener(&window, search_slot.clone(), quit.clone(), Some(nav_rx))?;
 
         let _ = window.hide();
     } else {
@@ -279,17 +285,36 @@ fn run_launcher(resident: bool) -> Result<()> {
             quit_close.store(true, Ordering::Relaxed);
             slint::CloseRequestResponse::HideWindow
         });
+        start_nav_timer(&window, nav_rx);
         let _ = window.show();
     }
 
-    beca_layer_shell::run_launcher(msw, quit).map_err(|e| anyhow::anyhow!(e))?;
+    beca_layer_shell::run_launcher_with_nav(msw, quit, Some(nav_tx)).map_err(|e| anyhow::anyhow!(e))?;
     Ok(())
+}
+
+fn start_nav_timer(window: &SearchWindow, nav_rx: mpsc::Receiver<i32>) {
+    let weak = window.as_weak();
+    let timer = Timer::default();
+    timer.start(TimerMode::Repeated, Duration::from_millis(30), move || {
+        while let Ok(nav) = nav_rx.try_recv() {
+            if let Some(w) = weak.upgrade() {
+                if nav == 0 {
+                    w.invoke_activate_current();
+                } else {
+                    w.invoke_move_selection(nav);
+                }
+            }
+        }
+    });
+    std::mem::forget(timer);
 }
 
 fn start_control_listener(
     window: &SearchWindow,
     slot: Rc<RefCell<Option<Table>>>,
     quit: Arc<AtomicBool>,
+    nav_rx: Option<mpsc::Receiver<i32>>,
 ) -> Result<()> {
     let path = control_socket_path();
     if let Some(parent) = path.parent() {
@@ -324,11 +349,25 @@ fn start_control_listener(
 
     let weak = window.as_weak();
     let timer = Timer::default();
-    timer.start(TimerMode::Repeated, Duration::from_millis(60), move || {
+    timer.start(TimerMode::Repeated, Duration::from_millis(30), move || {
+        if let Some(nav_rx) = nav_rx.as_ref() {
+            while let Ok(nav) = nav_rx.try_recv() {
+                if let Some(w) = weak.upgrade() {
+                    if nav == 0 {
+                        w.invoke_activate_current();
+                    } else {
+                        w.invoke_move_selection(nav);
+                    }
+                }
+            }
+        }
         while let Ok(cmd) = rx.try_recv() {
             match cmd.as_str() {
                 "show" => {
-
+                    if let Some(w) = weak.upgrade() {
+                        w.set_query("".into());
+                        w.set_selected_index(0);
+                    }
                     if let Some(search) = slot.borrow().clone() {
                         if let Ok(cb) = search.get::<Function>("on_search") {
                             let _ = cb.call::<()>(String::new());

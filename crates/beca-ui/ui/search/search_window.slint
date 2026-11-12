@@ -1,4 +1,4 @@
-import { LineEdit, Button, ScrollView } from "std-widgets.slint";
+import { LineEdit, ScrollView } from "std-widgets.slint";
 import { Theme } from "../theme.slint";
 
 export struct AppEntry {
@@ -8,92 +8,126 @@ export struct AppEntry {
 
 export component SearchWindow inherits Window {
     title: "beca";
-    width: 640px;
-    height: 460px;
+    width: 560px;
+    height: 420px;
     background: #00000000;
     no-frame: true;
 
     in-out property <string> placeholder: "Search...";
+    in-out property <string> query: "";
     in-out property <[AppEntry]> results: [];
+    in-out property <int> selected-index: 0;
 
     callback search_requested(string);
     callback result_selected(string);
+    callback activate_selected();
 
     forward-focus: search-input;
 
-    Rectangle {
-        background: Theme.card-bg;
-        border-radius: 16px;
+    public function move_selection(delta: int) {
+        if (root.results.length <= 0) {
+            root.selected-index = 0;
+            return;
+        }
+        let next = root.selected-index + delta;
+        if (next < 0) { root.selected-index = 0; }
+        else if (next >= root.results.length) { root.selected-index = root.results.length - 1; }
+        else { root.selected-index = next; }
+    }
 
-        VerticalLayout {
-            padding: 18px;
-            spacing: 12px;
+    public function selected_name() -> string {
+        if (root.selected-index >= 0 && root.selected-index < root.results.length) {
+            return root.results[root.selected-index].name;
+        }
+        ""
+    }
 
-            Text {
-                text: "Search";
-                color: Theme.text-main;
-                font-size: 20px;
-                font-weight: 700;
-            }
+    public function activate_current() {
+        if (root.selected-index >= 0 && root.selected-index < root.results.length) {
+            root.result_selected(root.results[root.selected-index].name);
+        }
+    }
 
-            search-input := LineEdit {
-                placeholder-text: root.placeholder;
-                edited(text) => { root.search_requested(text); }
-                accepted(text) => { root.search_requested(text); }
-            }
+    VerticalLayout {
+        padding: 0px;
+        spacing: 6px;
+        alignment: start;
 
-            Text {
-                text: "Type to filter. Press Enter to search. Select a result to launch it.";
-                color: Theme.text-main;
-                font-size: 12px;
-                opacity: 0.7;
-            }
-
-            ScrollView {
-                vertical-stretch: 1;
-                VerticalLayout {
-                    spacing: 6px;
-                    for result in root.results: TouchArea {
-                        height: 42px;
-                        width: 100%;
-                        clicked => { root.result_selected(result.name); }
-                        Rectangle {
-                            background: parent.has-hover ? Theme.surface : Theme.surface-alt;
-                            border-radius: 8px;
-
-                            HorizontalLayout {
-                                padding-left: 10px;
-                                padding-right: 10px;
-                                spacing: 10px;
-                                alignment: start;
-
-                                Image {
-                                    width: 24px;
-                                    height: 24px;
-                                    source: result.icon;
-                                    image-fit: contain;
-                                    vertical-alignment: center;
-                                    visible: result.icon.width > 0;
-                                }
-
-                                Text {
-                                    text: result.name;
-                                    color: Theme.text-main;
-                                    vertical-alignment: center;
-                                    font-size: 14px;
-                                    overflow: elide;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        Rectangle {
+            background: Theme.card-bg;
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: Theme.card-border;
 
             HorizontalLayout {
-                alignment: end;
-                Button {
-                    text: "Close";
-                    clicked => { root.hide(); }
+                padding: 10px;
+                spacing: 8px;
+                search-input := LineEdit {
+                    horizontal-stretch: 1;
+                    placeholder-text: root.placeholder;
+                    text <=> root.query;
+                    edited(text) => {
+                        root.selected-index = 0;
+                        root.search_requested(text);
+                    }
+                    accepted(text) => { root.activate_current(); }
+                }
+            }
+        }
+
+        if root.results.length > 0 : Rectangle {
+            vertical-stretch: 1;
+            background: Theme.card-bg;
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: Theme.card-border;
+
+            ScrollView {
+                width: 100%;
+                height: 100%;
+                viewport-height: root.results.length * 40px;
+
+                for result[idx] in root.results: Rectangle {
+                    y: idx * 40px;
+                    height: 40px;
+                    width: parent.width;
+                    background: idx == root.selected-index ? Theme.accent.with-alpha(0.25)
+                        : (touch.has-hover ? Theme.surface : transparent);
+                    border-radius: 8px;
+
+                    touch := TouchArea {
+                        width: 100%;
+                        height: 100%;
+                        clicked => {
+                            root.selected-index = idx;
+                            root.result_selected(result.name);
+                        }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 10px;
+                        alignment: start;
+
+                        Image {
+                            width: 22px;
+                            height: 22px;
+                            source: result.icon;
+                            image-fit: contain;
+                            vertical-alignment: center;
+                            visible: result.icon.width > 0;
+                        }
+
+                        Text {
+                            text: result.name;
+                            color: Theme.text-main;
+                            vertical-alignment: center;
+                            font-size: 14px;
+                            font-weight: idx == root.selected-index ? 700 : 400;
+                            overflow: elide;
+                        }
+                    }
                 }
             }
         }

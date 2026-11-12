@@ -60,6 +60,7 @@ struct LauncherState {
     keyboard: Option<wl_keyboard::WlKeyboard>,
     keyboard_focused: bool,
     exit: bool,
+    nav_tx: Option<std::sync::mpsc::Sender<i32>>,
 }
 
 impl LauncherState {
@@ -177,6 +178,14 @@ pub fn run_launcher(
     window: Rc<MinimalSoftwareWindow>,
     quit: Arc<AtomicBool>,
 ) -> Result<(), String> {
+    run_launcher_with_nav(window, quit, None)
+}
+
+pub fn run_launcher_with_nav(
+    window: Rc<MinimalSoftwareWindow>,
+    quit: Arc<AtomicBool>,
+    nav_tx: Option<std::sync::mpsc::Sender<i32>>,
+) -> Result<(), String> {
     let conn = Connection::connect_to_env().map_err(|e| format!("wayland connect: {e}"))?;
     let (globals, mut event_queue) =
         registry_queue_init(&conn).map_err(|e| format!("registry: {e}"))?;
@@ -202,6 +211,7 @@ pub fn run_launcher(
         keyboard: None,
         keyboard_focused: false,
         exit: false,
+        nav_tx,
     };
 
     loop {
@@ -452,10 +462,30 @@ impl KeyboardHandler for LauncherState {
         }
         if let Some(text) = keysym_to_slint_text(&event) {
             let esc: SharedString = Key::Escape.into();
+            let up: SharedString = Key::UpArrow.into();
+            let down: SharedString = Key::DownArrow.into();
+            let ret: SharedString = Key::Return.into();
             if text == esc {
                 let _ = self.window.hide();
                 self.hide_surface();
                 return;
+            }
+            if let Some(tx) = &self.nav_tx {
+                if text == up {
+                    let _ = tx.send(-1);
+                    self.window.request_redraw();
+                    return;
+                }
+                if text == down {
+                    let _ = tx.send(1);
+                    self.window.request_redraw();
+                    return;
+                }
+                if text == ret {
+                    let _ = tx.send(0);
+                    self.window.request_redraw();
+                    return;
+                }
             }
             self.window.dispatch_event(WindowEvent::KeyPressed { text });
         }
@@ -475,9 +505,14 @@ impl KeyboardHandler for LauncherState {
         }
         if let Some(text) = keysym_to_slint_text(&event) {
             let esc: SharedString = Key::Escape.into();
-            if text != esc {
-                self.window.dispatch_event(WindowEvent::KeyReleased { text });
+            let up: SharedString = Key::UpArrow.into();
+            let down: SharedString = Key::DownArrow.into();
+            let ret: SharedString = Key::Return.into();
+            if text == esc || text == up || text == down || text == ret {
+                self.window.request_redraw();
+                return;
             }
+            self.window.dispatch_event(WindowEvent::KeyReleased { text });
         }
         self.window.request_redraw();
     }

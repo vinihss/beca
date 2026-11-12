@@ -8,6 +8,7 @@ use std::{
 };
 
 static APPS_CACHE: OnceLock<RwLock<Vec<Application>>> = OnceLock::new();
+const HISTORY_LIMIT: usize = 30;
 
 fn apps_cache() -> &'static RwLock<Vec<Application>> {
     APPS_CACHE.get_or_init(|| {
@@ -29,7 +30,6 @@ fn with_cached_applications<T>(f: impl FnOnce(&[Application]) -> T) -> T {
     if let Ok(cache) = apps_cache().read() {
         f(&cache)
     } else {
-
         reload_index();
         if let Ok(cache) = apps_cache().read() {
             f(&cache)
@@ -39,8 +39,69 @@ fn with_cached_applications<T>(f: impl FnOnce(&[Application]) -> T) -> T {
     }
 }
 
+fn history_path() -> PathBuf {
+    if let Some(dir) = env::var_os("XDG_CACHE_HOME") {
+        PathBuf::from(dir).join("beca").join("launcher_history")
+    } else if let Some(home) = env::var_os("HOME") {
+        PathBuf::from(home).join(".cache/beca/launcher_history")
+    } else {
+        PathBuf::from("/tmp/beca_launcher_history")
+    }
+}
+
+fn read_history() -> Vec<String> {
+    let path = history_path();
+    let Ok(content) = fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    content.lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect()
+}
+
+fn write_history(names: &[String]) {
+    let path = history_path();
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let _ = fs::write(path, names.join("\n"));
+}
+
+pub fn record_launch(name: &str) {
+    let mut hist = read_history();
+    hist.retain(|n| !n.eq_ignore_ascii_case(name));
+    hist.insert(0, name.to_string());
+    if hist.len() > HISTORY_LIMIT {
+        hist.truncate(HISTORY_LIMIT);
+    }
+    write_history(&hist);
+}
+
+pub fn recent() -> Vec<Application> {
+    let names = read_history();
+    if names.is_empty() {
+        return Vec::new();
+    }
+    with_cached_applications(|apps| {
+        let mut out = Vec::new();
+        for name in names {
+            if let Some(app) = apps.iter().find(|a| a.name.eq_ignore_ascii_case(&name)) {
+                out.push(app.clone());
+            }
+            if out.len() >= HISTORY_LIMIT {
+                break;
+            }
+        }
+        out
+    })
+}
+
 pub fn search(query: &str) -> Vec<Application> {
     let query = query.trim().to_lowercase();
+    if query.is_empty() {
+        let rec = recent();
+        if !rec.is_empty() {
+            return rec;
+        }
+    }
     let mut seen = HashSet::new();
     with_cached_applications(|apps| {
         apps.iter()
@@ -72,10 +133,11 @@ pub fn launch(name: &str) -> anyhow::Result<Child> {
         .split_first()
         .ok_or_else(|| anyhow::anyhow!("empty Exec field for {}", app.name))?;
 
-    Command::new(program)
+    let child = Command::new(program)
         .args(arguments)
-        .spawn()
-        .map_err(Into::into)
+        .spawn()?;
+    record_launch(&app.name);
+    Ok(child)
 }
 
 fn read_applications() -> Vec<Application> {
