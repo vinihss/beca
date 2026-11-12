@@ -96,25 +96,30 @@ pub fn recent() -> Vec<Application> {
 
 pub fn search(query: &str) -> Vec<Application> {
     let query = query.trim().to_lowercase();
+    let mut seen = HashSet::new();
+    let mut out: Vec<Application> = Vec::new();
     if query.is_empty() {
-        let rec = recent();
-        if !rec.is_empty() {
-            return rec;
+        for app in recent() {
+            let key = app.name.to_lowercase();
+            if seen.insert(key) {
+                out.push(app);
+            }
         }
     }
-    let mut seen = HashSet::new();
     with_cached_applications(|apps| {
-        apps.iter()
-            .filter(|app| {
-                let name = app.name.to_lowercase();
-                let exec = app.exec.to_lowercase();
-                let matches = query.is_empty() || name.contains(&query) || exec.contains(&query);
-                matches && seen.insert(name.as_str().to_string())
-            })
-            .take(30)
-            .cloned()
-            .collect()
-    })
+        for app in apps.iter() {
+            let name = app.name.to_lowercase();
+            let exec = app.exec.to_lowercase();
+            let matches = query.is_empty() || name.contains(&query) || exec.contains(&query);
+            if matches && seen.insert(name.clone()) {
+                out.push(app.clone());
+            }
+            if out.len() >= 30 {
+                break;
+            }
+        }
+    });
+    out
 }
 
 pub fn launch(name: &str) -> anyhow::Result<Child> {

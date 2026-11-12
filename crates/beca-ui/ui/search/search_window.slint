@@ -10,7 +10,7 @@ export component SearchWindow inherits Window {
     title: "beca";
     width: 560px;
     height: 420px;
-    background: #00000000;
+    background: transparent;
     no-frame: true;
 
     in-out property <string> placeholder: "Search...";
@@ -54,7 +54,7 @@ export component SearchWindow inherits Window {
         alignment: start;
 
         Rectangle {
-            background: Theme.card-bg;
+            background: Theme.card-bg.with-alpha(0.85);
             border-radius: 12px;
             border-width: 1px;
             border-color: Theme.card-border;
@@ -77,7 +77,7 @@ export component SearchWindow inherits Window {
 
         if root.results.length > 0 : Rectangle {
             vertical-stretch: 1;
-            background: Theme.card-bg;
+            background: Theme.card-bg.with-alpha(0.85);
             border-radius: 12px;
             border-width: 1px;
             border-color: Theme.card-border;
