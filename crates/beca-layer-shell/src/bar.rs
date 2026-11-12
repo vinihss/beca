@@ -86,7 +86,6 @@ pub fn run_bar(
         theme: theme.clone(),
         position,
         exit: false,
-        quick_child: std::sync::Arc::new(Mutex::new(None)),
         converse_child: std::sync::Arc::new(Mutex::new(None)),
         pointer: None,
     };
@@ -129,7 +128,6 @@ pub fn run_bar(
 struct Timers {
     _clock: Option<Timer>,
     _volume: Option<Timer>,
-    _quick: Option<Timer>,
     _converse: Option<Timer>,
 }
 
@@ -160,7 +158,6 @@ struct BarState {
     theme: BecaTheme,
     position: BarPosition,
     exit: bool,
-    quick_child: std::sync::Arc<Mutex<Option<std::process::Child>>>,
     converse_child: std::sync::Arc<Mutex<Option<std::process::Child>>>,
 
     pointer: Option<wl_pointer::WlPointer>,
@@ -175,9 +172,9 @@ impl BarState {
         let bar = BarWindow::new().map_err(|e| format!("BarWindow: {e}"))?;
         apply_theme(&bar, &self.theme);
         configure_bar(&bar, &self.bar_cfg, self.position);
-        setup_callbacks(&bar, self.quick_child.clone(), self.converse_child.clone());
+        setup_callbacks(&bar, self.converse_child.clone());
         let _ = bar.show();
-        let _timers = setup_timers(&bar, &self.bar_cfg, self.quick_child.clone(), self.converse_child.clone());
+        let _timers = setup_timers(&bar, &self.bar_cfg, self.converse_child.clone());
 
         msw.set_size(slint::PhysicalSize::new(800, self.height));
 
@@ -385,16 +382,12 @@ fn configure_bar(bar: &BarWindow, cfg: &BarModuleConfig, position: BarPosition) 
     bar.set_launcher_label(cfg.launcher_label.clone().into());
     bar.set_show_volume_out(cfg.show_volume_out);
     bar.set_show_volume_in(cfg.show_volume_in);
-    bar.set_show_voice(cfg.show_voice);
-    bar.set_voice_label(cfg.voice_label.clone().into());
-    bar.set_show_voice_assistant(true);
-    bar.set_voice_assistant_label("VA".into());
+    bar.set_show_conversation(cfg.show_voice);
     bar.set_clock_section(cfg.clock_section.clone().into());
     bar.set_launcher_section(cfg.launcher_section.clone().into());
     bar.set_volume_out_section(cfg.volume_out_section.clone().into());
     bar.set_volume_in_section(cfg.volume_in_section.clone().into());
-    bar.set_voice_section(cfg.voice_section.clone().into());
-    bar.set_voice_assistant_section(cfg.voice_section.clone().into());
+    bar.set_conversation_section(cfg.voice_section.clone().into());
     bar.set_conversation_active(false);
     bar.set_left_align(cfg.left_align.clone().into());
     bar.set_center_align(cfg.center_align.clone().into());
@@ -404,50 +397,6 @@ fn configure_bar(bar: &BarWindow, cfg: &BarModuleConfig, position: BarPosition) 
     bar.set_clock_text(format_clock(&cfg.clock_format).into());
     if cfg.show_volume_out { let v = read_volume("@DEFAULT_AUDIO_SINK@"); bar.set_volume_out_text(v.text.into()); bar.set_volume_out_muted(v.muted); }
     if cfg.show_volume_in { let v = read_volume("@DEFAULT_AUDIO_SOURCE@"); bar.set_volume_in_text(v.text.into()); bar.set_volume_in_muted(v.muted); }
-}
-
-fn quick_spawn_or_signal(slot: &std::sync::Arc<Mutex<Option<std::process::Child>>>) {
-    let mut slot = match slot.lock() {
-        Ok(s) => s,
-        Err(_) => return,
-    };
-    let mut alive = false;
-    if let Some(child) = slot.as_mut() {
-        match child.try_wait() {
-            Ok(None) => alive = true,
-            Ok(Some(_)) => {
-                *slot = None;
-            }
-            Err(_) => alive = true,
-        }
-    }
-    if alive {
-
-        if let Some(dir) = std::env::var_os("XDG_RUNTIME_DIR") {
-            let path = std::path::PathBuf::from(dir).join("beca").join("quick.ctl");
-            if let Ok(mut s) = std::os::unix::net::UnixStream::connect(&path) {
-                use std::io::Write;
-                let _ = s.write_all(b"send\n");
-            } else {
-                eprintln!("[beca-bar] quick session ctl unreachable: {}", path.display());
-            }
-        }
-        return;
-    }
-
-    if let Ok(exe) = std::env::current_exe() {
-        let child = Command::new(exe)
-            .env("BECA_NO_DAEMON", "1")
-            .arg("mod")
-            .arg("--local")
-            .arg("voice:quick")
-            .arg("--respond")
-            .spawn();
-        match child {
-            Ok(c) => *slot = Some(c),
-            Err(e) => eprintln!("[beca-bar] failed to spawn voice:quick: {e}"),
-        }
-    }
 }
 
 fn converse_spawn_or_signal(slot: &std::sync::Arc<Mutex<Option<std::process::Child>>>) -> bool {
@@ -496,22 +445,10 @@ fn converse_spawn_or_signal(slot: &std::sync::Arc<Mutex<Option<std::process::Chi
     false
 }
 
-fn setup_callbacks(bar: &BarWindow, quick_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>, converse_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>) {
+fn setup_callbacks(bar: &BarWindow, converse_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>) {
     bar.on_launcher_clicked(|| {
         let exe = std::env::current_exe().ok().and_then(|p| p.to_str().map(|s| s.to_string())).unwrap_or_else(|| "beca".into());
         let _ = Command::new(exe).args(["mod", "launcher:show"]).spawn();
-    });
-    let weak_voice = bar.as_weak();
-    bar.on_voice_clicked(move || {
-        quick_spawn_or_signal(&quick_slot);
-
-        if let Some(bar) = weak_voice.upgrade() {
-            bar.set_voice_recording(true);
-        }
-    });
-    bar.on_voice_assistant_clicked(|| {
-        let req = serde_json::json!({"type":"mod","target":"voice:assistant","args":[]});
-        let _ = send_daemon(&req);
     });
     let weak_converse = bar.as_weak();
     bar.on_conversation_clicked(move || {
@@ -523,17 +460,7 @@ fn setup_callbacks(bar: &BarWindow, quick_slot: std::sync::Arc<Mutex<Option<std:
     });
 }
 
-fn send_daemon(req: &serde_json::Value) {
-    if let Ok(dir) = std::env::var("XDG_RUNTIME_DIR") {
-        let path = std::path::PathBuf::from(dir).join("beca").join("beca.sock");
-        if let Ok(mut stream) = std::os::unix::net::UnixStream::connect(path) {
-            use std::io::Write;
-            let _ = writeln!(stream, "{}", req);
-        }
-    }
-}
-
-fn setup_timers(bar: &BarWindow, cfg: &BarModuleConfig, quick_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>, converse_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>) -> Timers {
+fn setup_timers(bar: &BarWindow, cfg: &BarModuleConfig, converse_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>) -> Timers {
     let clock = if cfg.show_clock {
         let weak = bar.as_weak();
         let fmt = cfg.clock_format.clone();
@@ -558,37 +485,6 @@ fn setup_timers(bar: &BarWindow, cfg: &BarModuleConfig, quick_slot: std::sync::A
         });
         Some(timer)
     } else { None };
-
-    let quick = {
-        let weak = bar.as_weak();
-        let timer = Timer::default();
-        let mut was_running = false;
-        timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
-            let mut run = false;
-            if let Ok(mut slot) = quick_slot.lock() {
-                if let Some(child) = slot.as_mut() {
-                    match child.try_wait() {
-                        Ok(Some(_)) => {
-                            *slot = None;
-                        }
-                        Ok(None) => {
-                            run = true;
-                        }
-                        Err(_) => {
-                            run = true;
-                        }
-                    }
-                }
-            }
-            if run != was_running {
-                was_running = run;
-                if let Some(bar) = weak.upgrade() {
-                    bar.set_voice_recording(run);
-                }
-            }
-        });
-        Some(timer)
-    };
 
     let converse = {
         let weak = bar.as_weak();
@@ -621,7 +517,7 @@ fn setup_timers(bar: &BarWindow, cfg: &BarModuleConfig, quick_slot: std::sync::A
         Some(timer)
     };
 
-    Timers { _clock: clock, _volume: volume, _quick: quick, _converse: converse }
+    Timers { _clock: clock, _volume: volume, _converse: converse }
 }
 
 fn format_clock(format: &str) -> String {

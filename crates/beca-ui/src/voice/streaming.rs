@@ -215,8 +215,230 @@ fn spawn_tts_worker(opts: StreamOptions, rx: Receiver<String>) -> thread::JoinHa
     })
 }
 
+fn strip_drop_tokens(text: &str) -> String {
+    text.split_whitespace()
+        .filter(|token| {
+            let t = token.to_lowercase();
+            !(t.contains("http://")
+                || t.contains("https://")
+                || t.starts_with("www.")
+                || t.contains('@') && t.contains('.'))
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn pt_under_100(n: u64) -> String {
+    const UNITS: [&str; 20] = [
+        "zero", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove",
+        "dez", "onze", "doze", "treze", "catorze", "quinze", "dezesseis", "dezessete",
+        "dezoito", "dezenove",
+    ];
+    const TENS: [&str; 10] = [
+        "", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa",
+    ];
+    if n < 20 {
+        return UNITS[n as usize].to_string();
+    }
+    let tens = (n / 10) as usize;
+    let unit = (n % 10) as usize;
+    if unit == 0 {
+        TENS[tens].to_string()
+    } else {
+        format!("{} e {}", TENS[tens], UNITS[unit])
+    }
+}
+
+fn pt_under_1000(n: u64) -> String {
+    const HUNDREDS: [&str; 10] = [
+        "", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos",
+        "setecentos", "oitocentos", "novecentos",
+    ];
+    if n == 100 {
+        return "cem".to_string();
+    }
+    let hundreds = (n / 100) as usize;
+    let rest = n % 100;
+    if hundreds == 0 {
+        return pt_under_100(rest);
+    }
+    if rest == 0 {
+        return HUNDREDS[hundreds].to_string();
+    }
+    format!("{} e {}", HUNDREDS[hundreds], pt_under_100(rest))
+}
+
+fn pt_rest(n: u64) -> String {
+    let thousands = n / 1000;
+    let rest = n % 1000;
+    if thousands == 0 {
+        return pt_under_1000(rest);
+    }
+    let head = if thousands == 1 { "mil".to_string() } else { format!("{} mil", pt_under_1000(thousands)) };
+    if rest == 0 {
+        return head;
+    }
+    let sep = if rest < 100 || rest % 100 == 0 { " e " } else { " " };
+    format!("{head}{sep}{}", pt_under_1000(rest))
+}
+
+fn pt_int_words(n: u64) -> String {
+    if n == 0 {
+        return "zero".to_string();
+    }
+    let millions = n / 1_000_000;
+    let rest = n % 1_000_000;
+    if millions == 0 {
+        return pt_rest(rest);
+    }
+    let head = if millions == 1 {
+        "um milhão".to_string()
+    } else {
+        format!("{} milhões", pt_under_1000(millions))
+    };
+    if rest == 0 {
+        return head;
+    }
+    let sep = if rest < 100 || rest % 100 == 0 { " e " } else { " " };
+    format!("{head}{sep}{}", pt_rest(rest))
+}
+
+fn parse_number(int_token: &str, frac_token: Option<&str>) -> String {
+    let digits: String = int_token.chars().filter(|c| c.is_ascii_digit()).collect();
+    let value = digits.parse::<u64>().unwrap_or(0);
+    let mut out = pt_int_words(value);
+    if let Some(frac) = frac_token {
+        let frac = frac.to_string();
+        if frac.chars().all(|c| c == '0') {
+            return out;
+        }
+        match frac.parse::<u64>() {
+            Ok(f) => {
+                out.push_str(" vírgula ");
+                out.push_str(&pt_int_words(f));
+            }
+            Err(_) => {
+                out.push_str(" vírgula ");
+                for c in frac.chars() {
+                    out.push_str(pt_int_words((c as u64) - 48).as_str());
+                    out.push(' ');
+                }
+                let _ = out.pop();
+            }
+        }
+    }
+    out
+}
+
+fn wordify_numbers(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = String::with_capacity(text.len() + 64);
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        if !c.is_ascii_digit() {
+            if c == '-' || c == '‐' || c == '–' || c == '—' {
+                let next_digit = chars.get(i + 1).is_some_and(|d| d.is_ascii_digit());
+                let prev_alnum = out
+                    .chars()
+                    .rev()
+                    .find(|d| *d != ' ')
+                    .is_some_and(|d| d.is_ascii_alphanumeric());
+                if next_digit && prev_alnum {
+                    out.push_str(" a ");
+                } else if next_digit {
+                    out.push_str("menos ");
+                } else {
+                    out.push(' ');
+                }
+            } else {
+                out.push(c);
+            }
+            i += 1;
+            continue;
+        }
+        let mut int_token = String::new();
+        while i < chars.len() {
+            if chars[i].is_ascii_digit() {
+                int_token.push(chars[i]);
+                i += 1;
+                continue;
+            }
+            if chars[i] == '.' {
+                let d1 = chars.get(i + 1).is_some_and(|d| d.is_ascii_digit());
+                let d2 = chars.get(i + 2).is_some_and(|d| d.is_ascii_digit());
+                let d3 = chars.get(i + 3).is_some_and(|d| d.is_ascii_digit());
+                let d4 = chars.get(i + 4).is_some_and(|d| d.is_ascii_digit());
+                let boundary = chars.get(i + 4).map_or(true, |d| !d.is_ascii_digit());
+                if d1 && d2 && d3 && boundary && !d4 {
+                    int_token.push('.');
+                    i += 1;
+                    continue;
+                }
+            }
+            break;
+        }
+        let mut frac_token: Option<String> = None;
+        if chars.get(i) == Some(&',') && chars.get(i + 1).is_some_and(|d| d.is_ascii_digit()) {
+            i += 1;
+            let mut f = String::new();
+            while i < chars.len() && chars[i].is_ascii_digit() {
+                f.push(chars[i]);
+                i += 1;
+            }
+            frac_token = Some(f);
+        }
+        out.push_str(&parse_number(&int_token, frac_token.as_deref()));
+    }
+    out
+}
+
+fn sanitize_for_speech(text: &str) -> String {
+    let mut out = strip_drop_tokens(text);
+    for ch in ['*', '#', '`', '_', '~', '[', ']', '{', '}', '<', '>', '|', '•', '"', '\'', '“', '”', '‘', '’', '«', '»', '(', ')', '/', '→'] {
+        out = out.replace(ch, " ");
+    }
+    for ch in ["R$", "US$", "U$", "$"] {
+        out = out.replace(ch, " reais ");
+    }
+    out = out.replace('%', " por cento");
+    out = wordify_numbers(&out);
+    let mut collapsed = String::with_capacity(out.len());
+    let mut last_space = true;
+    for ch in out.chars() {
+        if ch == ' ' || ch == '\t' {
+            if !last_space {
+                collapsed.push(' ');
+            }
+            last_space = true;
+            continue;
+        }
+        collapsed.push(ch);
+        last_space = false;
+    }
+    let mut s = collapsed.trim_matches(|c| c == ' ' || c == ',' || c == '.').to_string();
+    while s.contains(", ,") {
+        s = s.replace(", ,", ",");
+    }
+    while s.contains(",  ") {
+        s = s.replace(",  ", ", ");
+    }
+    while s.contains(" .") {
+        s = s.replace(" .", ".");
+    }
+    while s.contains(" ,") {
+        s = s.replace(" ,", ",");
+    }
+    s
+}
+
 fn speak(opts: &StreamOptions, chunk: &str) -> Result<(), String> {
     let chunk = chunk.trim();
+    if chunk.is_empty() {
+        return Ok(());
+    }
+    let chunk_owned = sanitize_for_speech(chunk);
+    let chunk = chunk_owned.trim();
     if chunk.is_empty() {
         return Ok(());
     }
@@ -285,6 +507,49 @@ mod tests {
         let (chunk, rest) = take_chunk("Hmm... pronto.").expect("chunk");
         assert_eq!(chunk, "Hmm...");
         assert_eq!(rest, "pronto.");
+    }
+
+    #[test]
+    fn sanitize_strips_markdown_and_symbols() {
+        assert_eq!(sanitize_for_speech("*bold* and `code`"), "bold and code");
+        assert_eq!(sanitize_for_speech("(test) [array] {map}"), "test array map");
+        assert_eq!(sanitize_for_speech("olá — tudo bem?"), "olá tudo bem?");
+        assert_eq!(sanitize_for_speech("a/b"), "a b");
+        assert_eq!(sanitize_for_speech("“quote”"), "quote");
+    }
+
+    #[test]
+    fn sanitize_drops_urls_and_emails() {
+        assert_eq!(sanitize_for_speech("veja www.example.com agora"), "veja agora");
+        assert_eq!(sanitize_for_speech("acesse https://example.com/a?b=1 fim"), "acesse fim");
+        assert_eq!(sanitize_for_speech("escreva para me@example.com hoje"), "escreva para hoje");
+    }
+
+    #[test]
+    fn sanitize_wordifies_pt_numbers() {
+        assert_eq!(sanitize_for_speech("custa 2500 reais"), "custa dois mil e quinhentos reais");
+        assert_eq!(sanitize_for_speech("hoje é 15"), "hoje é quinze");
+        assert_eq!(sanitize_for_speech("R$ 1.234,00"), "reais mil duzentos e trinta e quatro");
+        assert_eq!(sanitize_for_speech("3,5 por cento"), "três vírgula cinco por cento");
+        assert_eq!(sanitize_for_speech("50%"), "cinquenta por cento");
+        assert_eq!(sanitize_for_speech("1.000.000"), "um milhão");
+        assert_eq!(sanitize_for_speech("2.500"), "dois mil e quinhentos");
+        assert_eq!(sanitize_for_speech("1250"), "mil duzentos e cinquenta");
+        assert_eq!(sanitize_for_speech("112"), "cento e doze");
+        assert_eq!(sanitize_for_speech("101"), "cento e um");
+        assert_eq!(sanitize_for_speech("100"), "cem");
+    }
+
+    #[test]
+    fn sanitize_handles_ranges_and_negatives() {
+        assert_eq!(sanitize_for_speech("de 10-20 itens"), "de dez a vinte itens");
+        assert_eq!(sanitize_for_speech("-3 graus"), "menos três graus");
+    }
+
+    #[test]
+    fn sanitize_collapses_spaces() {
+        assert_eq!(sanitize_for_speech("a   b    c"), "a b c");
+        assert_eq!(sanitize_for_speech("  trim "), "trim");
     }
 
     #[test]

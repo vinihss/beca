@@ -63,6 +63,7 @@ impl OrbState {
 
         let input_region = Region::new(&self.compositor)
             .map_err(|e| format!("input region: {e}"))?;
+        input_region.add(0, 0, WIDTH as i32, HEIGHT as i32);
 
         let surface = self.compositor.create_surface(&self.qh);
         let layer = self.layer_shell.create_layer_surface(

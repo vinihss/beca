@@ -10,6 +10,54 @@ use std::time::Duration;
 
 use beca_ui::ui_loader;
 
+fn converse_spawn_or_signal(slot: &std::sync::Mutex<Option<std::process::Child>>) -> bool {
+    let mut slot = match slot.lock() {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    let mut alive = false;
+    if let Some(child) = slot.as_mut() {
+        match child.try_wait() {
+            Ok(None) => alive = true,
+            Ok(Some(_)) => {
+                *slot = None;
+            }
+            Err(_) => alive = true,
+        }
+    }
+    if alive {
+        if let Some(dir) = std::env::var_os("XDG_RUNTIME_DIR") {
+            let path = std::path::PathBuf::from(dir)
+                .join("beca")
+                .join("converse.ctl");
+            if let Ok(mut s) = std::os::unix::net::UnixStream::connect(&path) {
+                use std::io::Write;
+                let _ = s.write_all(b"quit\n");
+            } else {
+                eprintln!("[beca-bar] converse ctl unreachable: {}", path.display());
+            }
+        }
+        return false;
+    }
+
+    if let Ok(exe) = std::env::current_exe() {
+        let child = Command::new(exe)
+            .env("BECA_NO_DAEMON", "1")
+            .arg("mod")
+            .arg("--local")
+            .arg("voice:converse")
+            .spawn();
+        match child {
+            Ok(c) => {
+                *slot = Some(c);
+                return true;
+            }
+            Err(e) => eprintln!("[beca-bar] failed to spawn voice:converse: {e}"),
+        }
+    }
+    false
+}
+
 fn format_clock(format: &str) -> String {
 
     let out = Command::new("date").arg(format!("+{}", format)).output();
@@ -494,13 +542,7 @@ pub fn show(position: &str) -> Result<()> {
     );
     let _ = app.set_property("show-volume-out", Value::Bool(bar_cfg.show_volume_out));
     let _ = app.set_property("show-volume-in", Value::Bool(bar_cfg.show_volume_in));
-    let _ = app.set_property("show-voice", Value::Bool(bar_cfg.show_voice));
-    let _ = app.set_property(
-        "voice-label",
-        Value::String(bar_cfg.voice_label.clone().into()),
-    );
-    let _ = app.set_property("show-voice-assistant", Value::Bool(true));
-    let _ = app.set_property("voice-assistant-label", Value::String("VA".into()));
+    let _ = app.set_property("show-conversation", Value::Bool(bar_cfg.show_voice));
 
     let _ = app.set_property(
         "clock-section",
@@ -519,11 +561,7 @@ pub fn show(position: &str) -> Result<()> {
         Value::String(bar_cfg.volume_in_section.clone().into()),
     );
     let _ = app.set_property(
-        "voice-section",
-        Value::String(bar_cfg.voice_section.clone().into()),
-    );
-    let _ = app.set_property(
-        "voice-assistant-section",
+        "conversation-section",
         Value::String(bar_cfg.voice_section.clone().into()),
     );
     let _ = app.set_property(
@@ -566,105 +604,35 @@ pub fn show(position: &str) -> Result<()> {
         Value::Void
     });
 
-    let quick_slot: Arc<std::sync::Mutex<Option<std::process::Child>>> =
+    let converse_slot: Arc<std::sync::Mutex<Option<std::process::Child>>> =
         Arc::new(std::sync::Mutex::new(None));
 
     {
-        let quick_slot = quick_slot.clone();
-        let weak_voice = app.as_weak();
-        let _ = app.set_callback("voice-clicked", move |_args| {
-            let mut slot = match quick_slot.lock() {
-                Ok(s) => s,
-                Err(_) => return Value::Void,
-            };
-
-            let mut alive = false;
-            if let Some(child) = slot.as_mut() {
-                match child.try_wait() {
-                    Ok(None) => alive = true,
-                    Ok(Some(_)) => {
-                        *slot = None;
-                    }
-                    Err(_) => alive = true,
+        let converse_slot = converse_slot.clone();
+        let weak_converse = app.as_weak();
+        let _ = app.set_callback("conversation-clicked", move |_args| {
+            let active = converse_spawn_or_signal(&converse_slot);
+            let weak2 = weak_converse.clone();
+            let _ = ui_loader::invoke_on_event_loop(move || {
+                if let Some(app) = weak2.upgrade() {
+                    let _ = app.set_property("conversation-active", Value::Bool(active));
                 }
-            }
-            if alive {
-
-                if let Some(dir) = std::env::var_os("XDG_RUNTIME_DIR") {
-                    let path = std::path::PathBuf::from(dir)
-                        .join("beca")
-                        .join("quick.ctl");
-                    if let Ok(mut s) = std::os::unix::net::UnixStream::connect(&path) {
-                        use std::io::Write;
-                        let _ = s.write_all(b"send\n");
-                    } else {
-                        eprintln!("[beca-bar] quick session ctl unreachable: {}", path.display());
-                    }
-                }
-                return Value::Void;
-            }
-
-            if let Ok(exe) = std::env::current_exe() {
-                let child = Command::new(exe)
-                    .env("BECA_NO_DAEMON", "1")
-                    .arg("mod")
-                    .arg("--local")
-                    .arg("voice:quick")
-                    .arg("--respond")
-                    .spawn();
-                match child {
-                    Ok(c) => {
-                        *slot = Some(c);
-                        let weak2 = weak_voice.clone();
-                        let _ = ui_loader::invoke_on_event_loop(move || {
-                            if let Some(app) = weak2.upgrade() {
-                                let _ = app.set_property("voice-recording", Value::Bool(true));
-                            }
-                        });
-                    }
-                    Err(e) => eprintln!("[beca-bar] failed to spawn voice:quick: {e}"),
-                }
-            }
+            });
             Value::Void
         });
     }
 
-    let _ = app.set_callback("voice-assistant-clicked", |_args| {
-        if let Ok(out) = Command::new("hyprctl").args(["clients", "-j"]).output() {
-            if out.status.success() {
-                if let Ok(clients) = serde_json::from_slice::<Vec<serde_json::Value>>(&out.stdout) {
-                    if let Some(addr) = clients.iter().find_map(|c| {
-                        let title = c.get("title").and_then(|v| v.as_str()).unwrap_or("");
-                        if title == "Voice Assistant" {
-                            c.get("address").and_then(|v| v.as_str()).map(|s| s.to_string())
-                        } else {
-                            None
-                        }
-                    }) {
-                        let _ = Command::new("hyprctl")
-                            .args(["dispatch", "focuswindow", &format!("address:{addr}")])
-                            .spawn();
-                        return Value::Void;
-                    }
-                }
-            }
-        }
-        let req = serde_json::json!({"type":"mod","target":"voice:assistant","args":[]});
-        let _ = crate::daemon::send_request(&req);
-        Value::Void
-    });
-
     let running = Arc::new(AtomicBool::new(true));
 
     {
-        let quick_slot = quick_slot.clone();
+        let converse_slot = converse_slot.clone();
         let weak_poll = app.as_weak();
         let running_flag = running.clone();
         thread::spawn(move || {
             let mut was_running = false;
             while running_flag.load(Ordering::Relaxed) {
                 let mut run = false;
-                if let Ok(mut slot) = quick_slot.lock() {
+                if let Ok(mut slot) = converse_slot.lock() {
                     if let Some(child) = slot.as_mut() {
                         match child.try_wait() {
                             Ok(Some(_)) => {
@@ -684,7 +652,7 @@ pub fn show(position: &str) -> Result<()> {
                     let weak2 = weak_poll.clone();
                     let _ = ui_loader::invoke_on_event_loop(move || {
                         if let Some(app) = weak2.upgrade() {
-                            let _ = app.set_property("voice-recording", Value::Bool(run));
+                            let _ = app.set_property("conversation-active", Value::Bool(run));
                         }
                     });
                 }

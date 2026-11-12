@@ -2,7 +2,6 @@ import { Theme } from "../theme.slint";
 import { ClockWidget } from "./clock_widget.slint";
 import { LauncherWidget } from "./launcher_widget.slint";
 import { VolumeWidget } from "./volume_widget.slint";
-import { VoiceWidget } from "./voice_widget.slint";
 import { ConversationWidget } from "./conversation_widget.slint";
 
 export component BarWindow inherits Window {
@@ -17,20 +16,14 @@ export component BarWindow inherits Window {
     in-out property <string> volume-in-text: "--%";
     in-out property <bool> volume-out-muted: false;
     in-out property <bool> volume-in-muted: false;
-    in-out property <bool> show-voice: true;
-    in-out property <string> voice-label: "Voice";
-
-    in-out property <bool> voice-recording: false;
-    in-out property <bool> show-voice-assistant: true;
-    in-out property <string> voice-assistant-label: "VA";
+    in-out property <bool> show-conversation: true;
     in-out property <bool> conversation-active: false;
 
     in-out property <string> clock-section: "center";
     in-out property <string> launcher-section: "left";
     in-out property <string> volume-out-section: "right";
     in-out property <string> volume-in-section: "right";
-    in-out property <string> voice-section: "center";
-    in-out property <string> voice-assistant-section: "left";
+    in-out property <string> conversation-section: "center";
 
     in-out property <string> left-align: "start";
     in-out property <string> center-align: "center";
@@ -38,8 +31,6 @@ export component BarWindow inherits Window {
     in-out property <float> background-opacity: 1.0;
     in-out property <bool> show-border: false;
     callback launcher-clicked();
-    callback voice-clicked();
-    callback voice-assistant-clicked();
     callback conversation-clicked();
 
     property <[string]> section-names: ["left", "center", "right"];
@@ -85,19 +76,10 @@ export component BarWindow inherits Window {
                         label: root.launcher-label;
                         clicked => { root.launcher-clicked(); }
                     }
-                    if root.show-voice-assistant && root.voice-assistant-section == section : VoiceWidget {
-                        label: root.voice-assistant-label;
-                        clicked => { root.voice-assistant-clicked(); }
-                    }
                     if root.show-clock && root.clock-section == section : ClockWidget {
                         time-text: root.clock-text;
                     }
-                    if root.show-voice && root.voice-section == section : VoiceWidget {
-                        label: root.voice-label;
-                        icon-color: root.voice-recording ? #f7768e : Theme.accent;
-                        clicked => { root.voice-clicked(); }
-                    }
-                    if root.show-voice && root.voice-section == section : ConversationWidget {
+                    if root.show-conversation && root.conversation-section == section : ConversationWidget {
                         icon-color: root.conversation-active ? #f7768e : Theme.accent;
                         active: root.conversation-active;
                         clicked => { root.conversation-clicked(); }
