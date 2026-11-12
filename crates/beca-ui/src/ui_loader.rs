@@ -289,6 +289,7 @@ mod tests {
             "VoiceCaptureWindow",
             "VoiceAssistantWindow",
             "QuickVoiceWindow",
+            "ConversationOrb",
         ] {
             if let Err(e) = super::compile_component(name) {
                 panic!("{name} failed to compile: {e}");
@@ -305,6 +306,19 @@ mod tests {
             assert!(
                 available.iter().any(|c| c == cb),
                 "QuickVoiceWindow is missing callback `{cb}` (known: {available:?})"
+            );
+        }
+    }
+
+    #[test]
+    fn orb_window_declares_rust_callbacks() {
+        let def = super::compile_component("ConversationOrb")
+            .unwrap_or_else(|e| panic!("ConversationOrb failed to compile: {e}"));
+        let available: Vec<String> = def.callbacks().collect();
+        for cb in ["quit-orb"] {
+            assert!(
+                available.iter().any(|c| c == cb),
+                "ConversationOrb is missing callback `{cb}` (known: {available:?})"
             );
         }
     }

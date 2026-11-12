@@ -1,0 +1,125 @@
+import { Theme } from "../theme.slint";
+
+export component ConversationOrb inherits Window {
+    width: 440px;
+    height: 148px;
+    background: transparent;
+    no-frame: true;
+    always-on-top: true;
+    title: "beca-orb";
+
+    callback quit-orb();
+
+    in property <string> status-text: "Listening...";
+    in property <brush> status-color: #7aa2f7;
+    in property <string> transcript-text: "";
+    in property <string> response-text: "";
+    in property <float> input-level: 0.0;
+    in-out property <bool> reveal: false;
+
+    property <length> orb-size: 58px + (root.input-level.clamp(0.0, 1.0) * 30px);
+
+    Rectangle {
+        width: 100%;
+        height: root.height;
+        background: transparent;
+        y: root.reveal ? 0px : -root.height;
+        animate y {
+            duration: 260ms;
+            easing: ease-out;
+        }
+
+        Rectangle {
+            width: 100%;
+            height: 100%;
+            background: #171822ee;
+            border-radius: 16px;
+            border-width: 1px;
+            border-color: #2f3346;
+
+            HorizontalLayout {
+                padding: 12px;
+                spacing: 12px;
+                alignment: stretch;
+
+                Rectangle {
+                    width: 112px;
+                    background: transparent;
+
+                    Rectangle {
+                        width: root.orb-size + 18px;
+                        height: self.width;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: self.width / 2;
+                        background: root.status-color.with-alpha(0.16);
+                    }
+                    Rectangle {
+                        width: root.orb-size;
+                        height: self.width;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: self.width / 2;
+                        background: root.status-color.with-alpha(0.35);
+                        border-width: 2px;
+                        border-color: root.status-color;
+
+                        Text {
+                            text: "󰍬";
+                            color: #ffffff;
+                            font-family: Theme.icon-font-family;
+                            font-size: 21px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                VerticalLayout {
+                    spacing: 3px;
+                    padding-top: 2px;
+
+                    Text {
+                        text: root.status-text;
+                        color: root.status-color;
+                        font-size: 13px;
+                        font-weight: 700;
+                    }
+                    Text {
+                        text: root.transcript-text;
+                        color: #a9b1d6;
+                        font-size: 11px;
+                        wrap: word-wrap;
+                    }
+                    Text {
+                        text: root.response-text;
+                        color: #c0caf5;
+                        font-size: 11px;
+                        wrap: word-wrap;
+                    }
+                }
+
+                Rectangle {
+                    width: 26px;
+                    height: 26px;
+                    border-radius: 13px;
+                    background: stop-touch.has-hover ? #f7768e33 : transparent;
+
+                    Text {
+                        text: "✕";
+                        color: #f7768e;
+                        font-size: 14px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    stop-touch := TouchArea {
+                        clicked => { root.quit-orb(); }
+                        mouse-cursor: pointer;
+                    }
+                }
+            }
+        }
+    }
+}

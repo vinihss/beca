@@ -1,4 +1,5 @@
 pub mod capture;
+pub mod conversation;
 pub mod quick;
 pub mod streaming;
 pub mod transcribe;
@@ -8,6 +9,7 @@ pub use capture::{
     Args, CaptureOutcome, RespondConfig, VoiceTheme, VoiceUiTexts, apply_theme, run,
     run_capture_ui, run_capture_ui_with, run_configured,
 };
+pub use conversation::run_conversation;
 pub use transcribe::{
     copy_to_clipboard, default_output_path, handle_transcript, notify, transcribe,
 };

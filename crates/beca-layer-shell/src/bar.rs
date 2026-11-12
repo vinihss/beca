@@ -87,6 +87,7 @@ pub fn run_bar(
         position,
         exit: false,
         quick_child: std::sync::Arc::new(Mutex::new(None)),
+        converse_child: std::sync::Arc::new(Mutex::new(None)),
         pointer: None,
     };
 
@@ -129,6 +130,7 @@ struct Timers {
     _clock: Option<Timer>,
     _volume: Option<Timer>,
     _quick: Option<Timer>,
+    _converse: Option<Timer>,
 }
 
 struct BarInstance {
@@ -159,6 +161,7 @@ struct BarState {
     position: BarPosition,
     exit: bool,
     quick_child: std::sync::Arc<Mutex<Option<std::process::Child>>>,
+    converse_child: std::sync::Arc<Mutex<Option<std::process::Child>>>,
 
     pointer: Option<wl_pointer::WlPointer>,
 }
@@ -172,9 +175,9 @@ impl BarState {
         let bar = BarWindow::new().map_err(|e| format!("BarWindow: {e}"))?;
         apply_theme(&bar, &self.theme);
         configure_bar(&bar, &self.bar_cfg, self.position);
-        setup_callbacks(&bar, self.quick_child.clone());
+        setup_callbacks(&bar, self.quick_child.clone(), self.converse_child.clone());
         let _ = bar.show();
-        let _timers = setup_timers(&bar, &self.bar_cfg, self.quick_child.clone());
+        let _timers = setup_timers(&bar, &self.bar_cfg, self.quick_child.clone(), self.converse_child.clone());
 
         msw.set_size(slint::PhysicalSize::new(800, self.height));
 
@@ -392,6 +395,7 @@ fn configure_bar(bar: &BarWindow, cfg: &BarModuleConfig, position: BarPosition) 
     bar.set_volume_in_section(cfg.volume_in_section.clone().into());
     bar.set_voice_section(cfg.voice_section.clone().into());
     bar.set_voice_assistant_section(cfg.voice_section.clone().into());
+    bar.set_conversation_active(false);
     bar.set_left_align(cfg.left_align.clone().into());
     bar.set_center_align(cfg.center_align.clone().into());
     bar.set_right_align(cfg.right_align.clone().into());
@@ -446,7 +450,53 @@ fn quick_spawn_or_signal(slot: &std::sync::Arc<Mutex<Option<std::process::Child>
     }
 }
 
-fn setup_callbacks(bar: &BarWindow, quick_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>) {
+fn converse_spawn_or_signal(slot: &std::sync::Arc<Mutex<Option<std::process::Child>>>) -> bool {
+    let mut slot = match slot.lock() {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    let mut alive = false;
+    if let Some(child) = slot.as_mut() {
+        match child.try_wait() {
+            Ok(None) => alive = true,
+            Ok(Some(_)) => {
+                *slot = None;
+            }
+            Err(_) => alive = true,
+        }
+    }
+    if alive {
+        if let Some(dir) = std::env::var_os("XDG_RUNTIME_DIR") {
+            let path = std::path::PathBuf::from(dir).join("beca").join("converse.ctl");
+            if let Ok(mut s) = std::os::unix::net::UnixStream::connect(&path) {
+                use std::io::Write;
+                let _ = s.write_all(b"quit\n");
+            } else {
+                eprintln!("[beca-bar] converse ctl unreachable: {}", path.display());
+            }
+        }
+        return false;
+    }
+
+    if let Ok(exe) = std::env::current_exe() {
+        let child = Command::new(exe)
+            .env("BECA_NO_DAEMON", "1")
+            .arg("mod")
+            .arg("--local")
+            .arg("voice:converse")
+            .spawn();
+        match child {
+            Ok(c) => {
+                *slot = Some(c);
+                return true;
+            }
+            Err(e) => eprintln!("[beca-bar] failed to spawn voice:converse: {e}"),
+        }
+    }
+    false
+}
+
+fn setup_callbacks(bar: &BarWindow, quick_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>, converse_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>) {
     bar.on_launcher_clicked(|| {
         let exe = std::env::current_exe().ok().and_then(|p| p.to_str().map(|s| s.to_string())).unwrap_or_else(|| "beca".into());
         let _ = Command::new(exe).args(["mod", "launcher:show"]).spawn();
@@ -463,6 +513,14 @@ fn setup_callbacks(bar: &BarWindow, quick_slot: std::sync::Arc<Mutex<Option<std:
         let req = serde_json::json!({"type":"mod","target":"voice:assistant","args":[]});
         let _ = send_daemon(&req);
     });
+    let weak_converse = bar.as_weak();
+    bar.on_conversation_clicked(move || {
+        let active = converse_spawn_or_signal(&converse_slot);
+
+        if let Some(bar) = weak_converse.upgrade() {
+            bar.set_conversation_active(active);
+        }
+    });
 }
 
 fn send_daemon(req: &serde_json::Value) {
@@ -475,7 +533,7 @@ fn send_daemon(req: &serde_json::Value) {
     }
 }
 
-fn setup_timers(bar: &BarWindow, cfg: &BarModuleConfig, quick_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>) -> Timers {
+fn setup_timers(bar: &BarWindow, cfg: &BarModuleConfig, quick_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>, converse_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>) -> Timers {
     let clock = if cfg.show_clock {
         let weak = bar.as_weak();
         let fmt = cfg.clock_format.clone();
@@ -532,7 +590,38 @@ fn setup_timers(bar: &BarWindow, cfg: &BarModuleConfig, quick_slot: std::sync::A
         Some(timer)
     };
 
-    Timers { _clock: clock, _volume: volume, _quick: quick }
+    let converse = {
+        let weak = bar.as_weak();
+        let timer = Timer::default();
+        let mut was_running = false;
+        timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
+            let mut run = false;
+            if let Ok(mut slot) = converse_slot.lock() {
+                if let Some(child) = slot.as_mut() {
+                    match child.try_wait() {
+                        Ok(Some(_)) => {
+                            *slot = None;
+                        }
+                        Ok(None) => {
+                            run = true;
+                        }
+                        Err(_) => {
+                            run = true;
+                        }
+                    }
+                }
+            }
+            if run != was_running {
+                was_running = run;
+                if let Some(bar) = weak.upgrade() {
+                    bar.set_conversation_active(run);
+                }
+            }
+        });
+        Some(timer)
+    };
+
+    Timers { _clock: clock, _volume: volume, _quick: quick, _converse: converse }
 }
 
 fn format_clock(format: &str) -> String {

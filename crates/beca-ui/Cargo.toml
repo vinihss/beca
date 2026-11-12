@@ -19,6 +19,7 @@ serde.workspace = true
 serde_json.workspace = true
 ureq.workspace = true
 mlua.workspace = true
+earshot = "1.2.2"
 
 [build-dependencies]
 slint-build.workspace = true

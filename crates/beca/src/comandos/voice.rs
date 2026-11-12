@@ -271,6 +271,78 @@ fn run_voice_quick(args: &[String]) -> Result<()> {
     run_quick_session(args)
 }
 
+fn run_converse_session(_args: &[String]) -> Result<()> {
+    let resolved = beca_core::config::load();
+    let voice = &resolved.config.modules.voice;
+    let theme = resolved.theme.voice_theme();
+    let respond_cfg = beca_ui::voice::RespondConfig {
+        respond_command: voice.respond_command.clone(),
+        tts_command: voice.tts_command.clone(),
+        respond_stream: voice.respond_stream,
+        llm_url: voice.llm_url.clone(),
+        llm_model: voice.llm_model.clone(),
+    };
+    let base_url = voice.daemon_url.clone();
+    beca_ui::voice::run_conversation(&base_url, respond_cfg, theme).map_err(|e| anyhow::anyhow!(e))
+}
+
+fn run_voice_converse(args: &[String]) -> Result<()> {
+    let force_window = std::env::var_os("BECA_CONVERSE_FORCE_WINDOW").is_some();
+    #[cfg(target_os = "linux")]
+    if !force_window && std::env::var_os("WAYLAND_DISPLAY").is_some() {
+        use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+        use std::{collections::VecDeque, rc::Rc, sync::Mutex};
+
+        let queue = Arc::new(Mutex::new(VecDeque::<Rc<MinimalSoftwareWindow>>::new()));
+        beca_layer_shell::install_platform(queue.clone());
+        let msw = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        queue.lock().unwrap().push_back(msw.clone());
+
+        beca_ui::ui_loader::set_custom_event_loop(move || {
+            beca_layer_shell::run_orb_layer_shell(msw.clone())
+        });
+        unsafe { std::env::set_var("BECA_VOICE_LAYER_SHELL", "1") };
+        let r = run_converse_session(args);
+        unsafe { std::env::remove_var("BECA_VOICE_LAYER_SHELL") };
+
+        return match r {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                let msg = format!("{e:#}");
+                let fatal = msg.contains("flush")
+                    || msg.contains("roundtrip")
+                    || msg.contains("wayland connect")
+                    || msg.contains("registry")
+                    || msg.contains("wlr-layer-shell")
+                    || msg.contains("wl_shm");
+                eprintln!("[beca-converse] layer-shell session failed: {msg}");
+                if fatal {
+                    if let Ok(exe) = std::env::current_exe() {
+                        let mut cmd = std::process::Command::new(exe);
+                        cmd.arg("mod").arg("--local").arg("voice:converse");
+                        cmd.env("BECA_CONVERSE_FORCE_WINDOW", "1")
+                            .env("BECA_NO_DAEMON", "1");
+                        let status = cmd.status();
+                        match status {
+                            Ok(s) if s.success() => return Ok(()),
+                            Ok(s) => {
+                                anyhow::bail!("converse layer-shell fallback process exited with status {s}")
+                            }
+                            Err(err) => {
+                                anyhow::bail!("failed to spawn converse fallback: {err}")
+                            }
+                        }
+                    }
+                    anyhow::bail!("could not resolve current executable for fallback");
+                }
+                Err(e)
+            }
+        };
+    }
+
+    run_converse_session(args)
+}
+
 pub fn serve() -> Result<()> {
     let path = voice_ctl_path();
     if let Some(parent) = path.parent() {
@@ -380,6 +452,7 @@ pub fn dispatch(action: &str, args: &[String]) -> Result<()> {
             r
         }
         "quick" => run_voice_quick(args),
+        "converse" => run_voice_converse(args),
         "transcribe" => {
             let resolved = beca_core::config::load();
             let voice = &resolved.config.modules.voice;
