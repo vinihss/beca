@@ -4,16 +4,20 @@ import { Theme } from "../theme.slint";
 export component InfoCard inherits Rectangle {
     in property <string> title;
     in property <length> border-size: 1px;
-    background: Theme.card-bg;
-    border-radius: 8px;
+    in property <bool> outlined: false;
+    background: Theme.m3-surface-container;
+    border-radius: Theme.m3-shape-md;
+    border-width: root.outlined ? root.border-size : 0px;
+    border-color: Theme.m3-outline-variant;
 
     VerticalBox {
         padding: 16px;
         spacing: 8px;
         if root.title != "" : Text {
             text: root.title;
-            font-weight: 700;
-            color: Theme.text-main;
+            font-weight: 600;
+            font-size: 16px;
+            color: Theme.m3-on-surface;
         }
         @children
     }

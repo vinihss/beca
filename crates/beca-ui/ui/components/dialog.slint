@@ -1,0 +1,92 @@
+import { Theme } from "../theme.slint";
+import { M3Icon } from "icon.slint";
+
+// Material 3 Basic Dialog
+export component M3Dialog inherits Rectangle {
+    in property <string> headline: "";
+    in property <string> supporting-text: "";
+    in property <string> icon: "";
+    in property <string> confirm-text: "OK";
+    in property <string> dismiss-text: "Cancel";
+    in property <bool> show-dismiss: true;
+    in-out property <bool> open: false;
+    callback confirmed;
+    callback dismissed;
+
+    visible: root.open;
+    width: 100%; height: 100%;
+    background: transparent;
+
+    // scrim
+    Rectangle {
+        width: 100%; height: 100%;
+        background: #000000;
+        opacity: 0.32;
+        TouchArea { clicked => { if (root.show-dismiss) { root.open = false; root.dismissed(); } } }
+    }
+
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: min(312px, parent.width - 48px);
+        background: Theme.m3-surface-container-high;
+        border-radius: 28px;
+        drop-shadow-blur: 12px;
+        drop-shadow-color: #00000050;
+
+        VerticalLayout {
+            padding: 24px;
+            spacing: 16px;
+
+            if root.icon != "" : M3Icon {
+                name: root.icon; icon-size: 24px; icon-color: Theme.m3-secondary;
+                horizontal-alignment: center;
+            }
+
+            if root.headline != "" : Text {
+                text: root.headline;
+                color: Theme.m3-on-surface;
+                font-size: 24px;
+                wrap: word-wrap;
+                horizontal-alignment: root.icon != "" ? center : left;
+            }
+
+            if root.supporting-text != "" : Text {
+                text: root.supporting-text;
+                color: Theme.m3-on-surface-variant;
+                font-size: 14px;
+                wrap: word-wrap;
+            }
+
+            @children
+
+            HorizontalLayout {
+                alignment: end;
+                spacing: 8px;
+                padding-top: 8px;
+
+                if root.show-dismiss : Rectangle {
+                    min-width: 72px; height: 40px; border-radius: 20px;
+                    Text {
+                        text: root.dismiss-text;
+                        color: Theme.m3-primary;
+                        font-size: 14px; font-weight: 600;
+                        horizontal-alignment: center; vertical-alignment: center;
+                    }
+                    TouchArea { clicked => { root.open = false; root.dismissed(); } }
+                }
+
+                Rectangle {
+                    min-width: 72px; height: 40px; border-radius: 20px;
+                    Text {
+                        text: root.confirm-text;
+                        color: Theme.m3-primary;
+                        font-size: 14px; font-weight: 600;
+                        horizontal-alignment: center; vertical-alignment: center;
+                    }
+                    TouchArea { clicked => { root.open = false; root.confirmed(); } }
+                }
+            }
+        }
+    }
+}

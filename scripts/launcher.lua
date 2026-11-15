@@ -19,4 +19,3 @@ end
 
 -- Populate initial results so the list is not empty on open.
 search:set_results(beca.apps.search(""))
-search:show()

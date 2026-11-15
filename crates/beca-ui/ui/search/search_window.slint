@@ -51,7 +51,6 @@ export component SearchWindow inherits Window {
     VerticalLayout {
         padding: 0px;
         spacing: 6px;
-        alignment: start;
 
         Rectangle {
             background: Theme.card-bg.with-alpha(0.85);
@@ -75,17 +74,25 @@ export component SearchWindow inherits Window {
             }
         }
 
-        if root.results.length > 0 : Rectangle {
+        if root.results.length > 0 || root.query != "" : Rectangle {
             vertical-stretch: 1;
             background: Theme.card-bg.with-alpha(0.85);
             border-radius: 12px;
             border-width: 1px;
             border-color: Theme.card-border;
 
-            ScrollView {
+            if root.results.length == 0 : Text {
+                text: "Nenhum resultado";
+                color: Theme.text-strong.with-alpha(0.65);
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                font-size: 14px;
+            }
+
+            if root.results.length > 0 : ScrollView {
                 width: 100%;
                 height: 100%;
-                viewport-height: root.results.length * 40px;
+                content-height: root.results.length * 40px;
 
                 for result[idx] in root.results: Rectangle {
                     y: idx * 40px;

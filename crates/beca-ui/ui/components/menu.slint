@@ -1,0 +1,74 @@
+import { Theme } from "../theme.slint";
+import { M3Icon } from "icon.slint";
+
+export struct M3MenuItem {
+    label: string,
+    leading-icon: string,
+    trailing-text: string,
+    enabled: bool,
+    divider-after: bool,
+}
+
+export component M3Menu inherits Rectangle {
+    in property <[M3MenuItem]> items: [];
+    in property <length> menu-width: 200px;
+    callback item-selected(int);
+
+    width: root.menu-width;
+    background: Theme.m3-surface-container;
+    border-radius: 4px;
+    drop-shadow-blur: 8px;
+    drop-shadow-color: #00000050;
+    clip: true;
+
+    VerticalLayout {
+        padding-top: 8px; padding-bottom: 8px;
+        spacing: 0px;
+        for item[idx] in root.items : VerticalLayout {
+            spacing: 0px;
+            Rectangle {
+                height: 48px;
+                background: item-touch.has-hover && item.enabled ? Theme.m3-surface-container-highest : transparent;
+                opacity: item.enabled ? 1.0 : 0.38;
+
+                HorizontalLayout {
+                    padding-left: 12px; padding-right: 12px;
+                    spacing: 12px;
+                    alignment: start;
+
+                    if item.leading-icon != "" : M3Icon {
+                        name: item.leading-icon;
+                        icon-size: 24px;
+                        icon-color: Theme.m3-on-surface-variant;
+                        width: 24px;
+                    }
+
+                    Text {
+                        text: item.label;
+                        color: Theme.m3-on-surface;
+                        font-size: 14px;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+
+                    if item.trailing-text != "" : Text {
+                        text: item.trailing-text;
+                        color: Theme.m3-on-surface-variant;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                    }
+                }
+
+                item-touch := TouchArea {
+                    enabled: item.enabled;
+                    mouse-cursor: item.enabled ? pointer : default;
+                    clicked => { root.item-selected(idx); }
+                }
+            }
+            if item.divider-after : Rectangle {
+                height: 1px;
+                background: Theme.m3-outline-variant;
+            }
+        }
+    }
+}

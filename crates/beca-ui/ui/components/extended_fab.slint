@@ -1,0 +1,57 @@
+import { Theme } from "../theme.slint";
+import { M3Icon } from "icon.slint";
+
+export enum M3FabColor { primary, secondary, tertiary, surface }
+
+export component M3ExtendedFab inherits Rectangle {
+    in property <string> label;
+    in property <string> icon: "";
+    in property <M3FabColor> fab-color: M3FabColor.primary;
+    in property <bool> lowered: false;
+    in property <bool> enabled: true;
+    callback clicked;
+
+    property <color> bg: root.fab-color == M3FabColor.primary ? Theme.m3-primary-container
+        : root.fab-color == M3FabColor.secondary ? Theme.m3-secondary-container
+        : root.fab-color == M3FabColor.tertiary ? Theme.m3-tertiary-container
+        : Theme.m3-surface-container-high;
+    property <color> fg: root.fab-color == M3FabColor.primary ? Theme.m3-on-primary-container
+        : root.fab-color == M3FabColor.secondary ? Theme.m3-on-secondary-container
+        : root.fab-color == M3FabColor.tertiary ? Theme.m3-on-tertiary-container
+        : Theme.m3-primary;
+
+    height: 56px;
+    min-width: 80px;
+    border-radius: 16px;
+    opacity: root.enabled ? 1.0 : 0.38;
+    background: root.bg;
+    drop-shadow-blur: root.lowered ? 2px : 6px;
+    drop-shadow-color: #00000040;
+
+    state := Rectangle {
+        border-radius: 16px;
+        background: touch.pressed ? root.fg : touch.has-hover ? root.fg : transparent;
+        opacity: touch.pressed ? Theme.m3-state-pressed : touch.has-hover ? Theme.m3-state-hover : 0;
+    }
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: root.icon != "" ? 12px : 0px;
+        padding-left: root.icon != "" ? 16px : 20px;
+        padding-right: 20px;
+        if root.icon != "" : M3Icon { name: root.icon; icon-size: 24px; icon-color: root.fg; }
+        Text {
+            text: root.label;
+            color: root.fg;
+            font-size: 14px;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}

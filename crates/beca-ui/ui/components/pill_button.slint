@@ -3,32 +3,39 @@ import { Theme } from "../theme.slint";
 export component PillButton inherits Rectangle {
     in property <string> icon;
     in property <string> label: "";
-    in property <brush> icon-color: Theme.accent;
+    in property <brush> icon-color: Theme.m3-primary;
     in property <bool> active: false;
     in property <bool> enabled: true;
     callback clicked;
 
     min-width: 56px;
-    min-height: 24px;
-    border-radius: 6px;
-    opacity: root.enabled ? 1.0 : 0.45;
-    background: ((touch.has-hover && root.enabled) || root.active) ? Theme.surface-alt : transparent;
+    min-height: 32px;
+    border-radius: Theme.m3-shape-sm;
+    opacity: root.enabled ? 1.0 : 0.38;
+    background: root.active ? Theme.m3-secondary-container : transparent;
+
+    state-layer := Rectangle {
+        border-radius: parent.border-radius;
+        background: touch.pressed ? Theme.m3-on-surface
+            : touch.has-hover ? Theme.m3-on-surface : transparent;
+        opacity: (touch.has-hover && root.enabled) ? (touch.pressed ? Theme.m3-state-pressed : Theme.m3-state-hover) : 0;
+    }
 
     HorizontalLayout {
         alignment: center;
-        padding-left: 10px;
-        padding-right: 10px;
-        spacing: 6px;
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 8px;
         Text {
             text: root.icon;
-            color: root.icon-color;
+            color: root.active ? Theme.m3-on-secondary-container : root.icon-color;
             font-family: Theme.icon-font-family;
-            font-size: 14px;
+            font-size: 18px;
             vertical-alignment: center;
         }
         if root.label != "" : Text {
             text: root.label;
-            color: Theme.text-main;
+            color: root.active ? Theme.m3-on-secondary-container : Theme.m3-on-surface;
             font-size: 13px;
             font-weight: 600;
             vertical-alignment: center;
@@ -40,6 +47,6 @@ export component PillButton inherits Rectangle {
         height: 100%;
         enabled: root.enabled;
         clicked => { root.clicked(); }
-        mouse-cursor: pointer;
+        mouse-cursor: root.enabled ? pointer : default;
     }
 }

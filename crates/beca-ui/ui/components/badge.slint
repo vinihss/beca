@@ -1,0 +1,30 @@
+import { Theme } from "../theme.slint";
+
+// Material 3 Badge (small dot or large count) to overlay on icons/nav items
+export component M3Badge inherits Rectangle {
+    in property <string> label: ""; // empty => small dot
+    in property <int> count: 0;
+    in property <int> max-count: 999;
+    in property <bool> visible-badge: true;
+
+    property <string> text-value: root.label != "" ? root.label : (root.count > root.max-count ? root.max-count + "+" : (root.count > 0 ? root.count : ""));
+    property <bool> is-small: root.text-value == "";
+
+    visible: root.visible-badge;
+    background: Theme.m3-error;
+    border-radius: self.height / 2;
+    min-width: root.is-small ? 6px : 16px;
+    min-height: root.is-small ? 6px : 16px;
+    height: root.is-small ? 6px : 16px;
+    width: root.is-small ? 6px : max(16px, badge-text.preferred-width + 8px);
+
+    badge-text := Text {
+        visible: !root.is-small;
+        text: root.text-value;
+        color: Theme.m3-on-error;
+        font-size: 11px;
+        font-weight: 500;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}

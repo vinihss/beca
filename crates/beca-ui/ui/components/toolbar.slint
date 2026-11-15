@@ -1,0 +1,68 @@
+import { Theme } from "../theme.slint";
+import { M3Icon } from "icon.slint";
+
+export enum M3TopAppBarType { center-aligned, small, medium, large }
+
+export component M3TopAppBar inherits Rectangle {
+    in property <M3TopAppBarType> bar-type: M3TopAppBarType.small;
+    in property <string> title: "";
+    in property <string> navigation-icon: "arrow_back";
+    in property <bool> show-navigation: true;
+    in property <[string]> actions: [];
+    callback navigation-clicked;
+    callback action-clicked(int);
+
+    property <length> bar-height: root.bar-type == M3TopAppBarType.center-aligned ? 64px
+        : root.bar-type == M3TopAppBarType.small ? 64px
+        : root.bar-type == M3TopAppBarType.medium ? 112px : 152px;
+
+    height: root.bar-height;
+    background: Theme.m3-surface;
+
+    VerticalLayout {
+        padding-left: 4px; padding-right: 4px;
+        padding-top: 8px; padding-bottom: 8px;
+
+        HorizontalLayout {
+            alignment: space-between;
+            vertical-stretch: 0;
+            padding-left: 4px; padding-right: 4px;
+            height: 48px;
+
+            if root.show-navigation : Rectangle {
+                width: 48px; height: 48px; border-radius: 24px;
+                M3Icon { name: root.navigation-icon; icon-size: 24px; icon-color: Theme.m3-on-surface; }
+                TouchArea { clicked => { root.navigation-clicked(); } }
+            }
+            if !root.show-navigation : Rectangle { width: 48px; height: 1px; }
+
+            if root.bar-type == M3TopAppBarType.center-aligned || root.bar-type == M3TopAppBarType.small : Text {
+                text: root.title;
+                color: Theme.m3-on-surface;
+                font-size: 22px;
+                vertical-alignment: center;
+                horizontal-alignment: root.bar-type == M3TopAppBarType.center-aligned ? center : left;
+                horizontal-stretch: 1;
+            }
+            if root.bar-type == M3TopAppBarType.medium || root.bar-type == M3TopAppBarType.large : Rectangle { horizontal-stretch: 1; }
+
+            HorizontalLayout {
+                spacing: 0px;
+                for action[idx] in root.actions : Rectangle {
+                    width: 48px; height: 48px; border-radius: 24px;
+                    M3Icon { name: action; icon-size: 24px; icon-color: Theme.m3-on-surface-variant; }
+                    TouchArea { clicked => { root.action-clicked(idx); } }
+                }
+            }
+        }
+
+        if root.bar-type == M3TopAppBarType.medium || root.bar-type == M3TopAppBarType.large : Text {
+            text: root.title;
+            color: Theme.m3-on-surface;
+            font-size: root.bar-type == M3TopAppBarType.large ? 28px : 24px;
+            vertical-alignment: bottom;
+            padding-left: 16px; padding-bottom: 8px;
+            vertical-stretch: 1;
+        }
+    }
+}

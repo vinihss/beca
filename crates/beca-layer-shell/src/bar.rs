@@ -532,10 +532,52 @@ fn converse_spawn_or_signal(slot: &std::sync::Arc<Mutex<Option<std::process::Chi
     false
 }
 
+
+
+fn toggle_volume_mute(target: &str) {
+    if !Command::new("wpctl")
+        .args(["set-mute", target, "toggle"])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+    {
+        let (cmd, t) = if target == "@DEFAULT_AUDIO_SINK@" {
+            ("set-sink-mute", "@DEFAULT_SINK@")
+        } else {
+            ("set-source-mute", "@DEFAULT_SOURCE@")
+        };
+        let _ = Command::new("pactl").args([cmd, t, "toggle"]).status();
+    }
+}
+
+fn open_network_panel() {
+    if Command::new("nm-connection-editor").spawn().is_err() {
+        let _ = Command::new("nm-applet").spawn();
+    }
+}
+
+fn open_bluetooth_panel() {
+    let _ = Command::new("blueman-manager").spawn();
+}
+
+fn open_alerts_panel() {
+    if Command::new("swaync-client")
+        .args(["-t", "-sw"])
+        .spawn()
+        .is_ok()
+    {
+        return;
+    }
+    let _ = Command::new("dunstctl").args(["history-pop"]).spawn();
+}
+
 fn setup_callbacks(bar: &BarWindow, converse_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>) {
     bar.on_launcher_clicked(|| {
         let exe = std::env::current_exe().ok().and_then(|p| p.to_str().map(|s| s.to_string())).unwrap_or_else(|| "beca".into());
         let _ = Command::new(exe).args(["mod", "launcher:show"]).spawn();
+    });
+    bar.on_alerts_clicked(|| {
+        open_alerts_panel();
     });
     let weak_converse = bar.as_weak();
     bar.on_conversation_clicked(move || {
@@ -568,6 +610,31 @@ fn setup_callbacks(bar: &BarWindow, converse_slot: std::sync::Arc<Mutex<Option<s
             bar.set_volume_in_text(v.text.into());
             bar.set_volume_in_muted(v.muted);
         }
+    });
+
+    let weak_out_click = bar.as_weak();
+    bar.on_volume_out_clicked(move || {
+        toggle_volume_mute("@DEFAULT_AUDIO_SINK@");
+        if let Some(bar) = weak_out_click.upgrade() {
+            let v = read_volume("@DEFAULT_AUDIO_SINK@");
+            bar.set_volume_out_text(v.text.into());
+            bar.set_volume_out_muted(v.muted);
+        }
+    });
+    let weak_in_click = bar.as_weak();
+    bar.on_volume_in_clicked(move || {
+        toggle_volume_mute("@DEFAULT_AUDIO_SOURCE@");
+        if let Some(bar) = weak_in_click.upgrade() {
+            let v = read_volume("@DEFAULT_AUDIO_SOURCE@");
+            bar.set_volume_in_text(v.text.into());
+            bar.set_volume_in_muted(v.muted);
+        }
+    });
+    bar.on_network_clicked(|| {
+        open_network_panel();
+    });
+    bar.on_bluetooth_clicked(|| {
+        open_bluetooth_panel();
     });
 }
 

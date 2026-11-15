@@ -1,0 +1,84 @@
+import { Theme } from "../theme.slint";
+import { M3Icon } from "icon.slint";
+import { M3Badge } from "badge.slint";
+
+export struct M3RailDestination {
+    icon: string,
+    selected-icon: string,
+    label: string,
+    badge: string,
+}
+
+export component M3NavigationRail inherits Rectangle {
+    in property <[M3RailDestination]> destinations: [];
+    in-out property <int> selected-index: 0;
+    in property <bool> show-menu: true;
+    in property <bool> show-fab: false;
+    in property <string> fab-icon: "edit";
+    callback destination-selected(int);
+    callback menu-clicked;
+    callback fab-clicked;
+
+    width: 80px;
+    background: Theme.m3-surface;
+
+    VerticalLayout {
+        padding-top: 12px; padding-bottom: 12px;
+        spacing: 12px;
+        alignment: start;
+        horizontal-stretch: 0;
+
+        if root.show-menu : Rectangle {
+            width: 80px; height: 48px;
+            M3Icon { name: "menu"; icon-size: 24px; icon-color: Theme.m3-on-surface-variant; }
+            TouchArea { clicked => { root.menu-clicked(); } }
+        }
+
+        if root.show-fab : Rectangle {
+            width: 80px; height: 56px;
+            Rectangle {
+                x: 12px; width: 56px; height: 56px;
+                border-radius: 16px;
+                background: Theme.m3-primary-container;
+                M3Icon { name: root.fab-icon; icon-size: 24px; icon-color: Theme.m3-on-primary-container; }
+                TouchArea { clicked => { root.fab-clicked(); } }
+            }
+        }
+
+        for dest[idx] in root.destinations : Rectangle {
+            width: 80px; height: 56px;
+            property <bool> sel: idx == root.selected-index;
+            VerticalLayout {
+                alignment: center;
+                spacing: 4px;
+                Rectangle {
+                    width: 56px; height: 32px;
+                    border-radius: 16px;
+                    background: sel ? Theme.m3-secondary-container : transparent;
+                    M3Icon {
+                        name: sel && dest.selected-icon != "" ? dest.selected-icon : dest.icon;
+                        icon-size: 24px;
+                        icon-color: sel ? Theme.m3-on-secondary-container : Theme.m3-on-surface-variant;
+                    }
+                    if dest.badge != "" : M3Badge {
+                        x: 32px; y: 0px;
+                        label: dest.badge;
+                    }
+                }
+                Text {
+                    text: dest.label;
+                    color: sel ? Theme.m3-on-surface : Theme.m3-on-surface-variant;
+                    font-size: 12px;
+                    font-weight: sel ? 600 : 500;
+                    horizontal-alignment: center;
+                }
+            }
+            TouchArea {
+                clicked => {
+                    root.selected-index = idx;
+                    root.destination-selected(idx);
+                }
+            }
+        }
+    }
+}

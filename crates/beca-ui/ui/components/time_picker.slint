@@ -1,0 +1,117 @@
+import { Theme } from "../theme.slint";
+import { M3Icon } from "icon.slint";
+
+// Material 3 Time Picker (dial/input reference)
+export component M3TimePicker inherits Rectangle {
+    in-out property <int> hour: 7;
+    in-out property <int> minute: 30;
+    in-out property <bool> is-pm: true;
+    in property <bool> use-24h: false;
+    in-out property <bool> selecting-hour: true; // true = hour, false = minute
+    callback confirm;
+    callback cancel;
+
+    function fmt(v: int) -> string {
+        if (v < 10) { return "0" + v; }
+        return v + "";
+    }
+    function display-hour() -> string {
+        if (root.use-24h) { return root.fmt(root.hour); }
+        if (root.hour == 0) { return "12"; }
+        if (root.hour > 12) { return root.fmt(root.hour - 12); }
+        return root.fmt(root.hour);
+    }
+
+    background: Theme.m3-surface-container-high;
+    border-radius: 28px;
+    min-width: 320px;
+
+    VerticalLayout {
+        padding: 24px;
+        spacing: 20px;
+        alignment: start;
+
+        Text { text: "Select time"; color: Theme.m3-on-surface-variant; font-size: 12px; font-weight: 500; }
+
+        HorizontalLayout {
+            alignment: center;
+            spacing: 8px;
+            height: 80px;
+
+            Rectangle {
+                width: 96px; height: 72px; border-radius: 8px;
+                background: root.selecting-hour ? Theme.m3-primary-container : Theme.m3-surface-container-highest;
+                Text { text: root.display-hour(); color: root.selecting-hour ? Theme.m3-on-primary-container : Theme.m3-on-surface; font-size: 48px; horizontal-alignment: center; vertical-alignment: center; }
+                TouchArea { clicked => { root.selecting-hour = true; } }
+            }
+
+            Text { text: ":"; color: Theme.m3-on-surface; font-size: 48px; vertical-alignment: center; }
+
+            Rectangle {
+                width: 96px; height: 72px; border-radius: 8px;
+                background: !root.selecting-hour ? Theme.m3-primary-container : Theme.m3-surface-container-highest;
+                Text { text: root.fmt(root.minute); color: !root.selecting-hour ? Theme.m3-on-primary-container : Theme.m3-on-surface; font-size: 48px; horizontal-alignment: center; vertical-alignment: center; }
+                TouchArea { clicked => { root.selecting-hour = false; } }
+            }
+
+            if !root.use-24h : VerticalLayout {
+                width: 52px; spacing: 0px;
+                Rectangle {
+                    height: 36px; border-radius: 8px;
+                    background: !root.is-pm ? Theme.m3-tertiary-container : Theme.m3-surface-container-highest;
+                    Text { text: "AM"; color: !root.is-pm ? Theme.m3-on-tertiary-container : Theme.m3-on-surface-variant; font-size: 14px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+                    TouchArea { clicked => { root.is-pm = false; } }
+                }
+                Rectangle {
+                    height: 36px; border-radius: 8px;
+                    background: root.is-pm ? Theme.m3-tertiary-container : Theme.m3-surface-container-highest;
+                    Text { text: "PM"; color: root.is-pm ? Theme.m3-on-tertiary-container : Theme.m3-on-surface-variant; font-size: 14px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+                    TouchArea { clicked => { root.is-pm = true; } }
+                }
+            }
+        }
+
+        // Dial representation
+        Rectangle {
+            width: 220px; height: 220px;
+            border-radius: 110px;
+            background: Theme.m3-surface-container-highest;
+            x: (parent.width - self.width) / 2 - 24px;
+
+            Rectangle { width: 8px; height: 8px; border-radius: 4px; background: Theme.m3-primary; x: parent.width/2 - 4px; y: parent.height/2 - 4px; }
+            // 12/3/6/9 markers
+            Text { text: "12"; color: Theme.m3-on-surface; font-size: 14px; x: parent.width/2 - 8px; y: 8px; }
+            Text { text: "3"; color: Theme.m3-on-surface; font-size: 14px; x: parent.width - 20px; y: parent.height/2 - 8px; }
+            Text { text: "6"; color: Theme.m3-on-surface; font-size: 14px; x: parent.width/2 - 4px; y: parent.height - 24px; }
+            Text { text: "9"; color: Theme.m3-on-surface; font-size: 14px; x: 12px; y: parent.height/2 - 8px; }
+            // selection indicator
+            Rectangle {
+                width: 40px; height: 40px; border-radius: 20px;
+                background: Theme.m3-primary;
+                x: parent.width/2 - 20px; y: 28px;
+                Text {
+                    text: root.selecting-hour ? root.display-hour() : root.fmt(root.minute);
+                    color: Theme.m3-on-primary; font-size: 14px; font-weight: 600;
+                    horizontal-alignment: center; vertical-alignment: center;
+                }
+            }
+        }
+
+        // quick adjust for demo/reference
+        HorizontalLayout {
+            alignment: center; spacing: 12px;
+            Rectangle { width: 36px; height: 36px; border-radius: 18px; background: Theme.m3-surface-container-highest; Text { text: "-"; color: Theme.m3-on-surface; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; } TouchArea { clicked => { if (root.selecting-hour) { root.hour = root.hour > 0 ? root.hour - 1 : 23; } else { root.minute = root.minute > 0 ? root.minute - 5 : 55; } } } }
+            Text { text: root.selecting-hour ? "Hora" : "Minuto"; color: Theme.m3-on-surface-variant; font-size: 12px; vertical-alignment: center; }
+            Rectangle { width: 36px; height: 36px; border-radius: 18px; background: Theme.m3-surface-container-highest; Text { text: "+"; color: Theme.m3-on-surface; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; } TouchArea { clicked => { if (root.selecting-hour) { root.hour = root.hour < 23 ? root.hour + 1 : 0; } else { root.minute = root.minute < 55 ? root.minute + 5 : 0; } } } }
+        }
+
+        HorizontalLayout {
+            alignment: space-between; padding-top: 4px;
+            Rectangle { width: 40px; height: 40px; M3Icon { name: "keyboard"; icon-size: 24px; icon-color: Theme.m3-on-surface-variant; } }
+            HorizontalLayout { spacing: 8px;
+                Rectangle { width: 80px; height: 40px; Text { text: "Cancel"; color: Theme.m3-primary; font-size: 14px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; } TouchArea { clicked => { root.cancel(); } } }
+                Rectangle { width: 60px; height: 40px; Text { text: "OK"; color: Theme.m3-primary; font-size: 14px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; } TouchArea { clicked => { root.confirm(); } } }
+            }
+        }
+    }
+}

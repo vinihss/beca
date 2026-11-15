@@ -1,0 +1,98 @@
+import { Theme } from "../theme.slint";
+import { M3Icon } from "icon.slint";
+
+// Material 3 Date Picker (simplified calendar reference)
+// Exposes selected day/month/year; navigation and grid are representative.
+export component M3DatePicker inherits Rectangle {
+    in property <string> headline: "Select date";
+    in property <string> selected-date-text: "Mon, Aug 17";
+    in-out property <int> selected-day: 17;
+    in-out property <int> month: 8;
+    in-out property <int> year: 2026;
+    callback confirm;
+    callback cancel;
+    callback day-selected(int);
+
+    property <[string]> weekdays: ["S","M","T","W","T","F","S"];
+    // simplified 6x7 grid content (empty string = blank)
+    property <[[string]]> weeks: [
+        ["", "", "", "", "", "1","2"],
+        ["3","4","5","6","7","8","9"],
+        ["10","11","12","13","14","15","16"],
+        ["17","18","19","20","21","22","23"],
+        ["24","25","26","27","28","29","30"],
+        ["31","","","","","",""]
+    ];
+    property <[string]> month-names: ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+    background: Theme.m3-surface-container-high;
+    border-radius: 28px;
+    min-width: 328px;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+
+        Text { text: root.headline; color: Theme.m3-on-surface-variant; font-size: 12px; font-weight: 500; }
+        Text { text: root.selected-date-text; color: Theme.m3-on-surface; font-size: 28px; }
+
+        Rectangle { height: 1px; background: Theme.m3-outline-variant; }
+
+        HorizontalLayout {
+            height: 40px; alignment: space-between;
+            Rectangle { width: 40px; M3Icon { name: "chevron_left"; icon-size: 24px; icon-color: Theme.m3-on-surface-variant; } TouchArea { clicked => { if (root.month > 1) { root.month -= 1; } else { root.month = 12; root.year -= 1; } } } }
+            Text {
+                text: root.month-names[root.month - 1] + " " + root.year;
+                color: Theme.m3-on-surface; font-size: 14px; font-weight: 600; vertical-alignment: center;
+            }
+            Rectangle { width: 40px; M3Icon { name: "chevron_right"; icon-size: 24px; icon-color: Theme.m3-on-surface-variant; } TouchArea { clicked => { if (root.month < 12) { root.month += 1; } else { root.month = 1; root.year += 1; } } } }
+        }
+
+        HorizontalLayout {
+            height: 32px;
+            for d in root.weekdays : Rectangle {
+                horizontal-stretch: 1;
+                Text { text: d; color: Theme.m3-on-surface; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
+            }
+        }
+
+        for week in root.weeks : HorizontalLayout {
+            height: 40px;
+            for day in week : Rectangle {
+                horizontal-stretch: 1;
+                property <bool> has-day: day != "";
+                property <bool> is-sel: has-day && day == root.selected-day + "";
+                Rectangle {
+                    width: 36px; height: 36px;
+                    x: (parent.width - self.width) / 2; y: 2px;
+                    border-radius: 18px;
+                    background: is-sel ? Theme.m3-primary : transparent;
+                }
+                if has-day : Text {
+                    text: day;
+                    color: is-sel ? Theme.m3-on-primary : Theme.m3-on-surface;
+                    font-size: 14px;
+                    horizontal-alignment: center; vertical-alignment: center;
+                }
+                TouchArea {
+                    enabled: has-day;
+                    clicked => {
+                        root.selected-day = day == "1" ? 1 : day == "2" ? 2 : day == "3" ? 3 : day == "4" ? 4 : day == "5" ? 5
+                          : day == "6" ? 6 : day == "7" ? 7 : day == "8" ? 8 : day == "9" ? 9 : day == "10" ? 10
+                          : day == "11" ? 11 : day == "12" ? 12 : day == "13" ? 13 : day == "14" ? 14 : day == "15" ? 15
+                          : day == "16" ? 16 : day == "17" ? 17 : day == "18" ? 18 : day == "19" ? 19 : day == "20" ? 20
+                          : day == "21" ? 21 : day == "22" ? 22 : day == "23" ? 23 : day == "24" ? 24 : day == "25" ? 25
+                          : day == "26" ? 26 : day == "27" ? 27 : day == "28" ? 28 : day == "29" ? 29 : day == "30" ? 30 : 31;
+                        root.day-selected(root.selected-day);
+                    }
+                }
+            }
+        }
+
+        HorizontalLayout {
+            alignment: end; spacing: 8px; padding-top: 8px;
+            Rectangle { width: 80px; height: 40px; Text { text: "Cancel"; color: Theme.m3-primary; font-size: 14px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; } TouchArea { clicked => { root.cancel(); } } }
+            Rectangle { width: 60px; height: 40px; Text { text: "OK"; color: Theme.m3-primary; font-size: 14px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; } TouchArea { clicked => { root.confirm(); } } }
+        }
+    }
+}

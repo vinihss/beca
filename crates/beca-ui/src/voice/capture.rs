@@ -740,19 +740,19 @@ pub struct VoiceTheme {
 impl Default for VoiceTheme {
     fn default() -> Self {
         Self {
-            background: "#1E1E1E".into(),
-            text_main: "#FFFFFF".into(),
-            card_bg: "#2D2D2D".into(),
-            card_border: "#3F3F3F".into(),
-            surface: "#2D2D2D".into(),
-            surface_alt: "#131522".into(),
-            border: "#3F3F3F".into(),
-            text_strong: "#FFFFFF".into(),
-            accent: "#007ACC".into(),
-            accent_success: "#2f6f4f".into(),
-            accent_danger: "#a04040".into(),
-            recording: "#f7768e".into(),
-            radius: 6.0,
+            background: "#141218".into(),
+            text_main: "#E6E0E9".into(),
+            card_bg: "#211F26".into(),
+            card_border: "#49454F".into(),
+            surface: "#211F26".into(),
+            surface_alt: "#2B2930".into(),
+            border: "#49454F".into(),
+            text_strong: "#E6E0E9".into(),
+            accent: "#D0BCFF".into(),
+            accent_success: "#4CAF50".into(),
+            accent_danger: "#F2B8B5".into(),
+            recording: "#F2B8B5".into(),
+            radius: 12.0,
             dark_mode: true,
         }
     }

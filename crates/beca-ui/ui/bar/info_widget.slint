@@ -3,12 +3,21 @@ import { Theme } from "../theme.slint";
 export component InfoWidget inherits Rectangle {
     in property <string> icon: "";
     in property <string> text: "--";
-    in property <color> icon-color: Theme.accent;
-    in property <color> text-color: Theme.text-main;
+    in property <color> icon-color: Theme.m3-primary;
+    in property <color> text-color: Theme.m3-on-surface;
+    in property <bool> clickable: false;
+    callback clicked();
 
     min-width: 44px;
     min-height: 24px;
     background: transparent;
+
+    touch := TouchArea {
+        width: 100%;
+        height: 100%;
+        enabled: root.clickable;
+        clicked => { root.clicked(); }
+    }
 
     HorizontalLayout {
         alignment: center;

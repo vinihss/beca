@@ -43,7 +43,7 @@ crates/
   beca-apps/            .desktop: desktop_entry, indexer (search/launch)
   beca-ui/              Slint kit (ui/): Theme, SearchWindow, VoiceCaptureWindow + voice engine
   beca-layer-shell/     wlr-layer-shell surfaces (bar, launcher, quick HUD, voice window)
-docs/                   architecture.md, agents.md, hyprland_ipc.md, schema/
+docs/                   architecture.md, agents.md, hyprland_ipc.md, ui-design-system.md, schema/
 examples/               example Lua scripts
 scripts/                reference scripts (launcher.lua)
 docs/schema/            config/theme examples · scripts/launcher.lua
@@ -73,7 +73,8 @@ Wayland   <──protocols──>        │  events + dispatch + layer-shell
 3. **Runtime theme** — settable `Theme` tokens + apply loaded theme. **(done)**
 4. **Unified runtime** — `beca.*` by domain, scripts on disk (XDG), lifecycle/reload. **(expanded: `system/voice/events/runtime/hooks`, `beca.ui.window/run/quit`, `beca run`, reload/basic hooks, bridge in `beca-core`; missing in-context living lifecycle and hyprland→events streaming in-process)**
 5. **Hyprland/Wayland daemon** — compositor IPC, layer-shell, `beca.hyprland`, binds/events.
-6. **Additional modules** — bar, notifications, etc.
+6. **UI design system** — maturação da UI (tokens semânticos, primitivas normalizadas, catálogo/storybook nativo separado, identidade reavaliada). Plano e decisões em `docs/ui-design-system.md` (**Fase 0 em preparação**).
+7. **Additional modules** — bar, notifications, etc.
 
 ## 7. Invariants
 - Pipe/binds: stdout = transcription, no `--hold`, stable exit. `POST /transcribe` → `{ "text" }`.

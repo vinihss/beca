@@ -1,0 +1,58 @@
+import { Theme } from "../theme.slint";
+
+// Material 3 Snackbar
+export component M3Snackbar inherits Rectangle {
+    in property <string> message: "";
+    in property <string> action-text: "";
+    in property <bool> show-close: false;
+    in property <bool> two-line: false;
+    in-out property <bool> open: true;
+    callback action-clicked;
+    callback dismissed;
+
+    visible: root.open && root.message != "";
+    background: Theme.m3-inverse-surface;
+    border-radius: 4px;
+    min-height: root.two-line ? 68px : 48px;
+    min-width: 200px;
+
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 8px;
+        padding-top: 14px;
+        padding-bottom: 14px;
+        spacing: 8px;
+        alignment: space-between;
+
+        Text {
+            text: root.message;
+            color: Theme.m3-inverse-on-surface;
+            font-size: 14px;
+            wrap: word-wrap;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+
+        if root.action-text != "" : Rectangle {
+            min-width: 60px;
+            background: transparent;
+            Text {
+                text: root.action-text;
+                color: Theme.m3-inverse-primary;
+                font-size: 14px;
+                font-weight: 600;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            TouchArea {
+                clicked => { root.action-clicked(); }
+            }
+        }
+
+        if root.show-close : Rectangle {
+            width: 32px; height: 32px;
+            Text { text: "×"; color: Theme.m3-inverse-on-surface; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
+            TouchArea { clicked => { root.open = false; root.dismissed(); } }
+        }
+    }
+}

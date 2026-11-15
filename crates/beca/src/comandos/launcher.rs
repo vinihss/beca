@@ -200,6 +200,7 @@ fn run_launcher(resident: bool) -> Result<()> {
                         }
                     }
                     if let Some(w) = weak_show.upgrade() {
+                        w.window().request_redraw();
                         let _ = w.show();
                     }
                     Ok(())
@@ -374,6 +375,7 @@ fn start_control_listener(
                         }
                     }
                     if let Some(w) = weak.upgrade() {
+                        w.window().request_redraw();
                         let _ = w.show();
                     }
                 }

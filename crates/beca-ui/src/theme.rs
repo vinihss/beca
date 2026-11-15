@@ -43,23 +43,22 @@ pub struct ThemeTokens {
 
 impl Default for ThemeTokens {
     fn default() -> Self {
-
         let c = |hex: &str| parse_color(hex).expect("valid default color");
         Self {
             dark_mode: true,
-            radius: 6.0,
-            background: c("#1E1E1E"),
-            text_main: c("#FFFFFF"),
-            card_bg: c("#2D2D2D"),
-            card_border: c("#3F3F3F"),
-            surface: Brush::SolidColor(c("#2D2D2D")),
-            surface_alt: Brush::SolidColor(c("#131522")),
-            border: Brush::SolidColor(c("#3F3F3F")),
-            text_strong: Brush::SolidColor(c("#FFFFFF")),
-            accent: Brush::SolidColor(c("#007ACC")),
-            accent_success: Brush::SolidColor(c("#2f6f4f")),
-            accent_danger: Brush::SolidColor(c("#a04040")),
-            recording: Brush::SolidColor(c("#f7768e")),
+            radius: 12.0,
+            background: c("#141218"),
+            text_main: c("#E6E0E9"),
+            card_bg: c("#211F26"),
+            card_border: c("#49454F"),
+            surface: Brush::SolidColor(c("#211F26")),
+            surface_alt: Brush::SolidColor(c("#2B2930")),
+            border: Brush::SolidColor(c("#49454F")),
+            text_strong: Brush::SolidColor(c("#E6E0E9")),
+            accent: Brush::SolidColor(c("#D0BCFF")),
+            accent_success: Brush::SolidColor(c("#4CAF50")),
+            accent_danger: Brush::SolidColor(c("#F2B8B5")),
+            recording: Brush::SolidColor(c("#F2B8B5")),
         }
     }
 }

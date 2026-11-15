@@ -29,6 +29,7 @@
 - Expand lifecycle/reload in living context and UI integration; evolve `beca.hyprland` (streaming `.socket2.sock` → `beca.events` in-process, daemon bridge).
 - Daemon: surface management/lifecycle, layer-shell/Wayland, rich routing.
 - Fully config-driven voice (title/flow/behavior via `beca-core`).
+- **UI design system:** tokens semânticos, primitivas normalizadas e catálogo/storybook nativo separado (`beca-ui-catalog`), com identidade visual a reavaliar — ver `docs/ui-design-system.md`.
 
 ## Gotchas
 - **`--hold` vs pipe**: pipe = stdout+exit (binds), no `--hold`. STT daemon `POST /transcribe` → `{ "text" }` (default `127.0.0.1:4100`, `VOICE_DAEMON_URL`).

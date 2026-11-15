@@ -1,0 +1,38 @@
+import { Theme } from "../theme.slint";
+
+// Material Symbols icon helper
+export component M3Icon inherits Text {
+    in property <string> name: "";
+    in property <length> icon-size: 24px;
+    in property <brush> icon-color: Theme.m3-on-surface;
+
+    text: root.name;
+    font-family: Theme.icon-font-family;
+    font-size: root.icon-size;
+    color: root.icon-color;
+    horizontal-alignment: center;
+    vertical-alignment: center;
+}
+
+// Icon reference/placeholder grid entry (for iconography docs)
+export component M3IconRef inherits Rectangle {
+    in property <string> name;
+    in property <string> label: root.name;
+    width: 64px; height: 64px;
+    border-radius: 8px;
+    background: Theme.m3-surface-container-high;
+
+    VerticalLayout {
+        alignment: center;
+        spacing: 4px;
+        padding: 6px;
+        M3Icon { name: root.name; icon-size: 24px; icon-color: Theme.m3-on-surface; }
+        Text {
+            text: root.label;
+            color: Theme.m3-on-surface-variant;
+            font-size: 9px;
+            horizontal-alignment: center;
+            overflow: elide;
+        }
+    }
+}

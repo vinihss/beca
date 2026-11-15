@@ -34,8 +34,8 @@ use wayland_client::{
 };
 use xkeysym::Keysym;
 
-const WIDTH: u32 = 640;
-const HEIGHT: u32 = 460;
+const WIDTH: u32 = 560;
+const HEIGHT: u32 = 420;
 
 struct LauncherInstance {
     layer: LayerSurface,

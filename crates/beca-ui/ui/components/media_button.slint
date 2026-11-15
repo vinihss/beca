@@ -5,21 +5,25 @@ export component MediaButton inherits Rectangle {
     in property <string> icon;
     in property <string> label: "";
     in property <bool> enabled: true;
-    in property <brush> accent: Theme.accent;
+    in property <brush> accent: Theme.m3-primary;
+    in property <brush> on-accent: Theme.m3-on-primary;
     in property <length> size: 48px;
     callback clicked;
 
     width: root.label == "" ? root.size : 118px;
     height: root.size;
     border-radius: root.height / 2;
-    opacity: root.enabled ? 1.0 : 0.45;
-    background: !root.enabled ? Theme.surface-alt
-        : touch.pressed ? root.accent.darker(20%)
-        : touch.has-hover ? root.accent.brighter(10%)
+    opacity: root.enabled ? 1.0 : 0.38;
+    background: !root.enabled ? Theme.m3-surface-container-high
+        : touch.pressed ? root.accent.darker(12%)
+        : touch.has-hover ? root.accent.brighter(6%)
         : root.accent;
+
+    animate background { duration: 120ms; }
 
     touch := TouchArea {
         enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
         clicked => { root.clicked(); }
     }
 
@@ -30,15 +34,16 @@ export component MediaButton inherits Rectangle {
         padding-right: root.label == "" ? 0 : 14px;
         Text {
             text: root.icon;
-            color: Theme.text-strong;
-            font-size: root.size * 0.38;
+            color: !root.enabled ? Theme.m3-on-surface.with-alpha(0.38) : root.on-accent;
+            font-family: Theme.icon-font-family;
+            font-size: root.size * 0.45;
             vertical-alignment: center;
             horizontal-alignment: center;
         }
         if root.label != "" : Text {
             text: root.label;
-            color: Theme.text-strong;
-            font-size: 13px;
+            color: !root.enabled ? Theme.m3-on-surface.with-alpha(0.38) : root.on-accent;
+            font-size: 12px;
             font-weight: 600;
             vertical-alignment: center;
         }

@@ -707,6 +707,10 @@ pub fn show(position: &str) -> Result<()> {
         let _ = Command::new(exe).args(["mod", "launcher:show"]).spawn();
         Value::Void
     });
+    let _ = app.set_callback("alerts-clicked", |_args| {
+        open_alerts_panel();
+        Value::Void
+    });
 
     let converse_slot: Arc<std::sync::Mutex<Option<std::process::Child>>> =
         Arc::new(std::sync::Mutex::new(None));
@@ -775,6 +779,45 @@ pub fn show(position: &str) -> Result<()> {
             Value::Void
         });
     }
+
+    {
+        let weak = app.as_weak();
+        let _ = app.set_callback("volume-out-clicked", move |_args| {
+            toggle_volume_mute("@DEFAULT_AUDIO_SINK@");
+            let v = read_volume("@DEFAULT_AUDIO_SINK@");
+            let weak2 = weak.clone();
+            let _ = ui_loader::invoke_on_event_loop(move || {
+                if let Some(app) = weak2.upgrade() {
+                    let _ = app.set_property("volume-out-text", Value::String(v.text.into()));
+                    let _ = app.set_property("volume-out-muted", Value::Bool(v.muted));
+                }
+            });
+            Value::Void
+        });
+    }
+    {
+        let weak = app.as_weak();
+        let _ = app.set_callback("volume-in-clicked", move |_args| {
+            toggle_volume_mute("@DEFAULT_AUDIO_SOURCE@");
+            let v = read_volume("@DEFAULT_AUDIO_SOURCE@");
+            let weak2 = weak.clone();
+            let _ = ui_loader::invoke_on_event_loop(move || {
+                if let Some(app) = weak2.upgrade() {
+                    let _ = app.set_property("volume-in-text", Value::String(v.text.into()));
+                    let _ = app.set_property("volume-in-muted", Value::Bool(v.muted));
+                }
+            });
+            Value::Void
+        });
+    }
+    let _ = app.set_callback("network-clicked", |_args| {
+        open_network_panel();
+        Value::Void
+    });
+    let _ = app.set_callback("bluetooth-clicked", |_args| {
+        open_bluetooth_panel();
+        Value::Void
+    });
 
     let running = Arc::new(AtomicBool::new(true));
 
@@ -980,6 +1023,46 @@ fn read_bluetooth() -> String {
         }
     }
     "--".into()
+}
+
+
+
+
+fn toggle_volume_mute(target: &str) {
+    if !std::process::Command::new("wpctl")
+        .args(["set-mute", target, "toggle"])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+    {
+        let (cmd, t) = if target == "@DEFAULT_AUDIO_SINK@" {
+            ("set-sink-mute", "@DEFAULT_SINK@")
+        } else {
+            ("set-source-mute", "@DEFAULT_SOURCE@")
+        };
+        let _ = std::process::Command::new("pactl").args([cmd, t, "toggle"]).status();
+    }
+}
+
+fn open_network_panel() {
+    if std::process::Command::new("nm-connection-editor").spawn().is_err() {
+        let _ = std::process::Command::new("nm-applet").spawn();
+    }
+}
+
+fn open_bluetooth_panel() {
+    let _ = std::process::Command::new("blueman-manager").spawn();
+}
+
+fn open_alerts_panel() {
+    if std::process::Command::new("swaync-client")
+        .args(["-t", "-sw"])
+        .spawn()
+        .is_ok()
+    {
+        return;
+    }
+    let _ = std::process::Command::new("dunstctl").args(["history-pop"]).spawn();
 }
 
 fn read_alerts() -> String {

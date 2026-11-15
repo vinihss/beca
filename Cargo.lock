@@ -603,6 +603,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "beca-ui-catalog"
+version = "0.1.0"
+dependencies = [
+ "beca-ui",
+ "slint",
+ "slint-build",
+]
+
+[[package]]
 name = "bincode"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

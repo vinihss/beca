@@ -1,0 +1,87 @@
+import { VerticalBox, HorizontalBox, ScrollView } from "std-widgets.slint";
+import { Theme, IconButton, PillButton, MediaButton, DesktopButton, InfoCard } from "../../beca-ui/ui/library.slint";
+
+export component CatalogWindow inherits Window {
+    title: "beca-ui catalog";
+    preferred-width: 960px;
+    preferred-height: 720px;
+    background: Theme.m3-background;
+
+    ScrollView {
+        VerticalBox {
+            padding: 24px;
+            spacing: 20px;
+
+            Text {
+                text: "beca-ui catalog — M3 purple baseline";
+                font-size: 24px;
+                font-weight: 700;
+                color: Theme.m3-on-background;
+            }
+
+            HorizontalBox {
+                spacing: 12px;
+                alignment: start;
+                DesktopButton { text: "Toggle dark mode"; clicked => { Theme.dark-mode = !Theme.dark-mode; } }
+                Text { text: Theme.dark-mode ? "dark" : "light"; color: Theme.m3-on-surface-variant; vertical-alignment: center; }
+            }
+
+            InfoCard {
+                title: "Foundations";
+                VerticalBox {
+                    spacing: 8px;
+                    Text { text: "primary / on-primary / containers"; color: Theme.m3-on-surface-variant; }
+                    HorizontalBox {
+                        spacing: 8px;
+                        Rectangle { width: 80px; height: 40px; border-radius: 8px; background: Theme.m3-primary; Text { text: "primary"; color: Theme.m3-on-primary; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; } }
+                        Rectangle { width: 80px; height: 40px; border-radius: 8px; background: Theme.m3-primary-container; Text { text: "container"; color: Theme.m3-on-primary-container; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; } }
+                        Rectangle { width: 80px; height: 40px; border-radius: 8px; background: Theme.m3-secondary-container; Text { text: "secondary"; color: Theme.m3-on-secondary-container; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; } }
+                        Rectangle { width: 80px; height: 40px; border-radius: 8px; background: Theme.m3-tertiary-container; Text { text: "tertiary"; color: Theme.m3-on-tertiary-container; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; } }
+                        Rectangle { width: 80px; height: 40px; border-radius: 8px; background: Theme.m3-error-container; Text { text: "error"; color: Theme.m3-on-error-container; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; } }
+                    }
+                    Text { text: "surface containers"; color: Theme.m3-on-surface-variant; }
+                    HorizontalBox {
+                        spacing: 4px;
+                        Rectangle { width: 70px; height: 32px; border-radius: 6px; background: Theme.m3-surface-container-lowest; border-width: 1px; border-color: Theme.m3-outline-variant; Text { text: "lowest"; color: Theme.m3-on-surface; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; } }
+                        Rectangle { width: 70px; height: 32px; border-radius: 6px; background: Theme.m3-surface-container-low; Text { text: "low"; color: Theme.m3-on-surface; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; } }
+                        Rectangle { width: 70px; height: 32px; border-radius: 6px; background: Theme.m3-surface-container; Text { text: "base"; color: Theme.m3-on-surface; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; } }
+                        Rectangle { width: 70px; height: 32px; border-radius: 6px; background: Theme.m3-surface-container-high; Text { text: "high"; color: Theme.m3-on-surface; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; } }
+                        Rectangle { width: 70px; height: 32px; border-radius: 6px; background: Theme.m3-surface-container-highest; Text { text: "highest"; color: Theme.m3-on-surface; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; } }
+                    }
+                }
+            }
+
+            InfoCard {
+                title: "Primitives";
+                VerticalBox {
+                    spacing: 16px;
+                    Text { text: "IconButton"; color: Theme.m3-on-surface-variant; font-weight: 600; }
+                    HorizontalBox { spacing: 8px; alignment: start;
+                        IconButton { icon: "⌕"; }
+                        IconButton { icon: "⚙"; active: true; }
+                        IconButton { icon: "🔔"; enabled: false; }
+                    }
+                    Text { text: "PillButton"; color: Theme.m3-on-surface-variant; font-weight: 600; }
+                    HorizontalBox { spacing: 8px; alignment: start;
+                        PillButton { icon: "W"; label: "Wi-Fi"; }
+                        PillButton { icon: "B"; label: "BT"; active: true; }
+                        PillButton { icon: "M"; label: "Mute"; enabled: false; }
+                    }
+                    Text { text: "MediaButton"; color: Theme.m3-on-surface-variant; font-weight: 600; }
+                    HorizontalBox { spacing: 12px; alignment: start;
+                        MediaButton { icon: "▶"; }
+                        MediaButton { icon: "⏸"; label: "Pause"; }
+                        MediaButton { icon: "■"; enabled: false; }
+                    }
+                    Text { text: "DesktopButton"; color: Theme.m3-on-surface-variant; font-weight: 600; }
+                    HorizontalBox { spacing: 12px; alignment: start;
+                        DesktopButton { text: "Primary"; }
+                        DesktopButton { text: "Disabled"; enabled: false; }
+                    }
+                    Text { text: "InfoCard (outlined)"; color: Theme.m3-on-surface-variant; font-weight: 600; }
+                    InfoCard { title: "Nested card"; outlined: true; Text { text: "Content using M3 surface/outline tokens."; color: Theme.m3-on-surface-variant; } }
+                }
+            }
+        }
+    }
+}

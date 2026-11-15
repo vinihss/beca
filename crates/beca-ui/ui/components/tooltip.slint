@@ -1,0 +1,68 @@
+import { Theme } from "../theme.slint";
+
+// Material 3 Plain Tooltip (show on hover)
+export component M3Tooltip inherits Rectangle {
+    in property <string> text: "";
+    in property <bool> show: touch.has-hover;
+
+    z: 100;
+    visible: root.show && root.text != "";
+    background: Theme.m3-inverse-surface;
+    border-radius: 4px;
+    min-height: 24px;
+    width: t.preferred-width + 16px;
+    height: t.preferred-height + 12px;
+
+    t := Text {
+        x: 8px; y: 6px;
+        text: root.text;
+        color: Theme.m3-inverse-on-surface;
+        font-size: 12px;
+        wrap: word-wrap;
+    }
+
+    // host area for hover detection when used as wrapper
+    touch := TouchArea {
+        width: 0; height: 0;
+    }
+}
+
+// Rich tooltip with supporting text and optional action
+export component M3RichTooltip inherits Rectangle {
+    in property <string> title: "";
+    in property <string> supporting-text: "";
+    in property <string> action-text: "";
+    callback action-clicked;
+
+    background: Theme.m3-inverse-surface;
+    border-radius: 12px;
+    padding: 12px;
+
+    VerticalLayout {
+        spacing: 4px;
+        if root.title != "" : Text {
+            text: root.title;
+            color: Theme.m3-inverse-on-surface;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        if root.supporting-text != "" : Text {
+            text: root.supporting-text;
+            color: Theme.m3-on-surface-variant;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+        if root.action-text != "" : Rectangle {
+            height: 28px;
+            background: transparent;
+            Text {
+                text: root.action-text;
+                color: Theme.m3-inverse-primary;
+                font-size: 13px;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
+            TouchArea { clicked => { root.action-clicked(); } }
+        }
+    }
+}

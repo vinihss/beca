@@ -1,0 +1,55 @@
+import { VerticalBox } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+
+export enum M3CardVariant { elevated, filled, outlined }
+
+// Material 3 Card
+export component M3Card inherits Rectangle {
+    in property <M3CardVariant> variant: M3CardVariant.elevated;
+    in property <string> title: "";
+    in property <string> supporting-text: "";
+    in property <bool> clickable: false;
+    callback clicked;
+
+    border-radius: 12px;
+    background: root.variant == M3CardVariant.elevated ? Theme.m3-surface-container-low
+        : root.variant == M3CardVariant.filled ? Theme.m3-surface-container-highest
+        : Theme.m3-surface;
+    border-width: root.variant == M3CardVariant.outlined ? 1px : 0px;
+    border-color: Theme.m3-outline-variant;
+    drop-shadow-blur: root.variant == M3CardVariant.elevated ? 3px : 0px;
+    drop-shadow-color: #00000040;
+
+    state-layer := Rectangle {
+        border-radius: parent.border-radius;
+        background: touch.pressed ? Theme.m3-on-surface
+            : touch.has-hover ? Theme.m3-on-surface : transparent;
+        opacity: touch.pressed ? Theme.m3-state-pressed
+            : touch.has-hover ? Theme.m3-state-hover : 0;
+    }
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+        if root.title != "" : Text {
+            text: root.title;
+            color: Theme.m3-on-surface;
+            font-size: 16px;
+            font-weight: 600;
+            wrap: word-wrap;
+        }
+        if root.supporting-text != "" : Text {
+            text: root.supporting-text;
+            color: Theme.m3-on-surface-variant;
+            font-size: 14px;
+            wrap: word-wrap;
+        }
+        @children
+    }
+
+    touch := TouchArea {
+        enabled: root.clickable;
+        mouse-cursor: root.clickable ? pointer : default;
+        clicked => { root.clicked(); }
+    }
+}

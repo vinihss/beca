@@ -54,6 +54,11 @@ export component BarWindow inherits Window {
     callback conversation-clicked();
     callback volume-out-scrolled(float);
     callback volume-in-scrolled(float);
+    callback alerts-clicked();
+    callback volume-out-clicked();
+    callback volume-in-clicked();
+    callback network-clicked();
+    callback bluetooth-clicked();
 
     property <[string]> section-names: ["left", "center", "right"];
     property <LayoutAlignment> left-align-value:
@@ -102,7 +107,7 @@ export component BarWindow inherits Window {
                         time-text: root.clock-text;
                     }
                     if root.show-conversation && root.conversation-section == section : ConversationWidget {
-                        icon-color: root.conversation-active ? #f7768e : Theme.accent;
+                        icon-color: root.conversation-active ? Theme.m3-error : Theme.m3-primary;
                         active: root.conversation-active;
                         clicked => { root.conversation-clicked(); }
                     }
@@ -111,24 +116,32 @@ export component BarWindow inherits Window {
                         value-text: root.volume-out-text;
                         muted: root.volume-out-muted;
                         scrolled(delta) => { root.volume-out-scrolled(delta); }
+                        clicked => { root.volume-out-clicked(); }
                     }
                     if root.show-volume-in && root.volume-in-section == section : VolumeWidget {
                         label: "󰍬";
                         value-text: root.volume-in-text;
                         muted: root.volume-in-muted;
                         scrolled(delta) => { root.volume-in-scrolled(delta); }
+                        clicked => { root.volume-in-clicked(); }
                     }
                     if root.show-network && root.network-section == section : InfoWidget {
                         icon: "󰖩";
                         text: root.network-text;
+                        clickable: true;
+                        clicked => { root.network-clicked(); }
                     }
                     if root.show-alerts && root.alerts-section == section : InfoWidget {
                         icon: "󰂚";
                         text: root.alerts-text;
+                        clickable: true;
+                        clicked => { root.alerts-clicked(); }
                     }
                     if root.show-bluetooth && root.bluetooth-section == section : InfoWidget {
                         icon: "󰂯";
                         text: root.bluetooth-text;
+                        clickable: true;
+                        clicked => { root.bluetooth-clicked(); }
                     }
                     if root.show-cpu && root.cpu-section == section : InfoWidget {
                         icon: "󰍛";

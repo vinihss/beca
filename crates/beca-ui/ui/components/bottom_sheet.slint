@@ -1,0 +1,64 @@
+import { Theme } from "../theme.slint";
+
+// Material 3 Bottom Sheet (modal/standard)
+export component M3BottomSheet inherits Rectangle {
+    in property <bool> modal: true;
+    in property <string> title: "";
+    in-out property <bool> open: false;
+    in property <length> sheet-height: 320px;
+    callback dismissed;
+
+    visible: root.open;
+    width: 100%; height: 100%;
+    background: transparent;
+
+    if root.modal : Rectangle {
+        width: 100%; height: 100%;
+        background: #000000; opacity: 0.32;
+        TouchArea { clicked => { root.open = false; root.dismissed(); } }
+    }
+
+    Rectangle {
+        x: 0;
+        y: parent.height - self.height;
+        width: 100%;
+        height: root.sheet-height;
+        background: Theme.m3-surface-container-low;
+        border-radius: 28px;
+        // top corners only visually approximated with clip
+        clip: true;
+
+        VerticalLayout {
+            padding-bottom: 24px;
+            spacing: 8px;
+
+            // drag handle
+            Rectangle {
+                height: 36px;
+                HorizontalLayout {
+                    alignment: center;
+                    Rectangle {
+                        y: 16px;
+                        width: 32px; height: 4px;
+                        border-radius: 2px;
+                        background: Theme.m3-on-surface-variant;
+                        opacity: 0.4;
+                    }
+                }
+            }
+
+            if root.title != "" : Text {
+                text: root.title;
+                color: Theme.m3-on-surface;
+                font-size: 22px;
+                font-weight: 600;
+                horizontal-alignment: center;
+            }
+
+            Rectangle {
+                vertical-stretch: 1;
+                @children
+            }
+        }
+    }
+}

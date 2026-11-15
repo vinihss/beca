@@ -1,0 +1,57 @@
+import { Theme } from "../theme.slint";
+import { M3Icon } from "icon.slint";
+
+export struct M3Segment {
+    label: string,
+    icon: string,
+    enabled: bool,
+}
+
+export component M3SegmentedButton inherits Rectangle {
+    in property <[M3Segment]> segments: [];
+    in-out property <int> selected-index: 0;
+    in property <bool> multi-select: false;
+    in-out property <[int]> selected-indices: [0];
+    callback selection-changed(int);
+
+    height: 40px;
+    border-radius: 20px;
+    border-width: 1px;
+    border-color: Theme.m3-outline;
+    background: transparent;
+    clip: true;
+
+    HorizontalLayout {
+        spacing: 0px;
+        for seg[idx] in root.segments : Rectangle {
+            property <bool> sel: !root.multi-select ? (idx == root.selected-index) : true;
+            horizontal-stretch: 1;
+            background: (idx == root.selected-index) ? Theme.m3-secondary-container : transparent;
+            border-width: idx > 0 ? 1px : 0px;
+            border-color: Theme.m3-outline;
+
+            HorizontalLayout {
+                alignment: center;
+                spacing: 6px;
+                padding-left: 12px; padding-right: 12px;
+                if (idx == root.selected-index) : M3Icon { name: "check"; icon-size: 18px; icon-color: Theme.m3-on-secondary-container; }
+                if seg.icon != "" && idx != root.selected-index : M3Icon { name: seg.icon; icon-size: 18px; icon-color: Theme.m3-on-surface; }
+                Text {
+                    text: seg.label;
+                    color: (idx == root.selected-index) ? Theme.m3-on-secondary-container : Theme.m3-on-surface;
+                    font-size: 14px;
+                    font-weight: 500;
+                    vertical-alignment: center;
+                }
+            }
+
+            TouchArea {
+                enabled: seg.enabled;
+                clicked => {
+                    root.selected-index = idx;
+                    root.selection-changed(idx);
+                }
+            }
+        }
+    }
+}
