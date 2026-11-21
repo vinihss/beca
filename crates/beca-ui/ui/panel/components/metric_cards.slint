@@ -1,0 +1,252 @@
+import { Theme } from "../../theme.slint";
+import { PanelCard } from "panel_card.slint";
+import { M3LinearProgress } from "../../components/progress.slint";
+import { PanelCore, PanelVolume } from "../models.slint";
+
+// CPU aggregate plus one proportional bar per logical core.
+export component PanelCpuCard inherits PanelCard {
+    in property <[PanelCore]> cores: [];
+    in property <string> total: "23%";
+    in property <string> caption: "8 núcleos lógicos";
+
+    title: "CPU por núcleo";
+    icon: "speed";
+    trailing: root.total + " · " + root.caption;
+
+    VerticalLayout {
+        spacing: 6px;
+
+        for core[idx] in root.cores : HorizontalLayout {
+            spacing: 8px;
+            Text {
+                text: core.label;
+                width: 44px;
+                color: Theme.m3-on-surface-variant;
+                font-size: 11px;
+                vertical-alignment: center;
+            }
+            M3LinearProgress {
+                progress: core.percent / 100.0;
+                horizontal-stretch: 1;
+            }
+            Text {
+                text: core.percent-text;
+                width: 34px;
+                color: Theme.m3-on-surface-variant;
+                font-size: 11px;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+// RAM and swap with separate used/total readings.
+export component PanelMemoryCard inherits PanelCard {
+    in property <string> ram-usage: "8,4 / 32 GB";
+    in property <float> ram-percent: 0.26;
+    in property <string> ram-text: "26%";
+    in property <string> swap-usage: "0,6 / 8 GB";
+    in property <float> swap-percent: 0.08;
+    in property <string> swap-text: "8%";
+
+    title: "Memória";
+    icon: "memory";
+    outlined: true;
+
+    VerticalLayout {
+        spacing: 4px;
+
+        HorizontalLayout {
+            Text {
+                text: "RAM";
+                color: Theme.m3-on-surface-variant;
+                font-size: 11px;
+                horizontal-stretch: 1;
+            }
+            Text {
+                text: root.ram-text;
+                color: Theme.m3-on-surface;
+                font-size: 11px;
+            }
+        }
+        Text {
+            text: root.ram-usage;
+            color: Theme.m3-on-surface;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        M3LinearProgress {
+            progress: root.ram-percent;
+            bar-height: 6px;
+        }
+
+        Rectangle { height: 6px; background: transparent; }
+
+        HorizontalLayout {
+            Text {
+                text: "Swap";
+                color: Theme.m3-on-surface-variant;
+                font-size: 11px;
+                horizontal-stretch: 1;
+            }
+            Text {
+                text: root.swap-text;
+                color: Theme.m3-on-surface-variant;
+                font-size: 11px;
+            }
+        }
+        Text {
+            text: root.swap-usage;
+            color: Theme.m3-on-surface-variant;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        M3LinearProgress {
+            progress: root.swap-percent;
+            bar-height: 4px;
+            indicator-color: Theme.m3-tertiary;
+        }
+        Text {
+            text: "Cache não é contabilizado como memória livre.";
+            color: Theme.m3-on-surface-variant;
+            font-size: 10px;
+            wrap: word-wrap;
+        }
+    }
+}
+
+// One row per monitored mount point, with usage and percentage.
+export component PanelStorageCard inherits PanelCard {
+    in property <[PanelVolume]> volumes: [];
+
+    title: "Armazenamento";
+    icon: "hard_drive";
+    elevated: true;
+
+    VerticalLayout {
+        spacing: 10px;
+
+        for volume[idx] in root.volumes : VerticalLayout {
+            spacing: 4px;
+
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: volume.mount;
+                    color: Theme.m3-on-surface;
+                    font-size: 12px;
+                    font-weight: 600;
+                    horizontal-stretch: 1;
+                }
+                Text {
+                    text: volume.usage;
+                    color: Theme.m3-on-surface-variant;
+                    font-size: 11px;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: volume.percent-text;
+                    color: volume.percent >= 0.85 ? Theme.m3-error : Theme.m3-on-surface-variant;
+                    font-size: 11px;
+                    font-weight: 600;
+                    width: 34px;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+            }
+            M3LinearProgress {
+                progress: volume.percent;
+                bar-height: 4px;
+                indicator-color: volume.percent >= 0.85 ? Theme.m3-error : Theme.m3-primary;
+            }
+            Text {
+                text: volume.note;
+                color: Theme.m3-on-surface-variant;
+                font-size: 10px;
+            }
+        }
+    }
+}
+
+// Selected interface, link state and both directions of traffic.
+export component PanelNetworkCard inherits PanelCard {
+    in property <string> interface: "wlan0";
+    in property <string> state: "conectado";
+    in property <string> down: "12,4 Mb/s";
+    in property <string> up: "1,2 Mb/s";
+    in property <string> peak: "pico 24,8 Mb/s";
+
+    title: "Rede";
+    icon: "wifi";
+    trailing: root.interface + " · " + root.state;
+
+    VerticalLayout {
+        spacing: 2px;
+        Text {
+            text: root.down;
+            color: Theme.m3-on-surface;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        Text {
+            text: "download";
+            color: Theme.m3-on-surface-variant;
+            font-size: 10px;
+        }
+        Rectangle { height: 6px; background: transparent; }
+        HorizontalLayout {
+            spacing: 8px;
+            Text {
+                text: "upload";
+                color: Theme.m3-on-surface-variant;
+                font-size: 11px;
+                horizontal-stretch: 1;
+            }
+            Text {
+                text: root.up;
+                color: Theme.m3-on-surface;
+                font-size: 12px;
+                font-weight: 600;
+            }
+        }
+        Text {
+            text: root.peak + " · medido sobre 2 coletas";
+            color: Theme.m3-on-surface-variant;
+            font-size: 10px;
+        }
+    }
+}
+
+// Sensor reading with its origin; absent sensors show "indisponível".
+export component PanelTemperatureCard inherits PanelCard {
+    in property <string> value: "54 °C";
+    in property <string> sensor: "coretemp · Package id 0";
+    in property <string> limit: "limite 100 °C";
+    in property <bool> available: true;
+
+    title: "Temperatura";
+    icon: "device_thermostat";
+    outlined: true;
+
+    VerticalLayout {
+        spacing: 2px;
+        Text {
+            text: root.available ? root.value : "indisponível";
+            color: root.available ? Theme.m3-on-surface : Theme.m3-on-surface-variant;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        Text {
+            text: root.available ? root.sensor : "sensor indisponível";
+            color: Theme.m3-on-surface-variant;
+            font-size: 10px;
+            overflow: elide;
+        }
+        Text {
+            text: root.available ? root.limit : "sem leitura confiável";
+            color: Theme.m3-on-surface-variant;
+            font-size: 10px;
+        }
+    }
+}

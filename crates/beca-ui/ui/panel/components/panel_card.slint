@@ -1,0 +1,51 @@
+import { Theme } from "../../theme.slint";
+import { M3Icon } from "../../components/icon.slint";
+
+// Surface + header chrome shared by the panel metric cards. Content goes in the
+// @children slot, which is placed inside the body layout.
+export component PanelCard inherits Rectangle {
+    in property <string> title: "";
+    in property <string> icon: "";
+    in property <string> trailing: "";
+    in property <bool> outlined: false;
+    in property <bool> elevated: false;
+
+    border-radius: Theme.m3-shape-md;
+    background: root.outlined ? Theme.m3-surface
+        : root.elevated ? Theme.m3-surface-container-low
+        : Theme.m3-surface-container-high;
+    border-width: root.outlined ? 1px : 0px;
+    border-color: Theme.m3-outline-variant;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 10px;
+
+        HorizontalLayout {
+            spacing: 6px;
+            if root.icon != "" : M3Icon {
+                name: root.icon;
+                icon-size: 18px;
+                icon-color: Theme.m3-on-surface-variant;
+            }
+            Text {
+                text: root.title;
+                color: Theme.m3-on-surface-variant;
+                font-size: 12px;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
+            Text {
+                text: root.trailing;
+                color: Theme.m3-on-surface-variant;
+                font-size: 11px;
+                horizontal-stretch: 1;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+
+        @children
+    }
+}

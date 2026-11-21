@@ -4,6 +4,10 @@ use std::path::{Path, PathBuf};
 
 use crate::theme::{Theme, load_theme};
 
+pub const DEFAULT_CONFIG_TOML: &str = include_str!("../../../docs/schema/config.example.toml");
+pub const DEFAULT_THEME_TOML: &str =
+    include_str!("../../../docs/schema/theme.default.example.toml");
+
 #[derive(Debug, Clone)]
 pub struct BecaPaths {
     pub config_dir: PathBuf,
@@ -35,6 +39,46 @@ impl BecaPaths {
         };
         self.themes_dir.join(name)
     }
+
+    pub fn ensure_dirs(&self) -> std::io::Result<()> {
+        fs::create_dir_all(&self.config_dir)?;
+        fs::create_dir_all(&self.themes_dir)?;
+        fs::create_dir_all(&self.scripts_dir)?;
+        Ok(())
+    }
+}
+
+fn seed_file(path: &Path, content: &str, force: bool) -> Result<bool, String> {
+    if path.exists() && !force {
+        return Ok(false);
+    }
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("create {}: {e}", parent.display()))?;
+    }
+    fs::write(path, content).map_err(|e| format!("write {}: {e}", path.display()))?;
+    Ok(true)
+}
+
+pub fn ensure_defaults(force: bool) -> Result<Vec<PathBuf>, String> {
+    ensure_defaults_with_paths(&BecaPaths::resolve(), force)
+}
+
+pub fn ensure_defaults_with_paths(paths: &BecaPaths, force: bool) -> Result<Vec<PathBuf>, String> {
+    paths
+        .ensure_dirs()
+        .map_err(|e| format!("create {}: {e}", paths.config_dir.display()))?;
+
+    let mut created = Vec::new();
+    let seeds = [
+        (&paths.config_file, DEFAULT_CONFIG_TOML),
+        (&paths.theme_file("default"), DEFAULT_THEME_TOML),
+    ];
+    for (path, content) in seeds {
+        if seed_file(path, content, force)? {
+            created.push(path.clone());
+        }
+    }
+    Ok(created)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -431,6 +475,9 @@ pub fn load() -> Resolved {
 }
 
 pub fn load_with_paths(paths: BecaPaths) -> Resolved {
+    if let Err(e) = ensure_defaults_with_paths(&paths, false) {
+        eprintln!("[beca][config] could not seed defaults: {e}");
+    }
     let (mut config, config_source) = load_config(&paths);
     apply_env(&mut config);
     let (theme, theme_source) = load_theme(&paths, &config.core.theme);

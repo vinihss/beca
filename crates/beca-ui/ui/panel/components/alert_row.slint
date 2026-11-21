@@ -1,0 +1,91 @@
+import { Theme } from "../../theme.slint";
+import { M3Icon } from "../../components/icon.slint";
+
+// Alert line: severity is carried by icon + text label, not colour alone.
+export component PanelAlertRow inherits Rectangle {
+    in property <int> severity: 0;
+    in property <string> severity-label: "Info";
+    in property <string> title: "";
+    in property <string> detail: "";
+    in property <string> time: "";
+    in property <string> source: "";
+    callback investigate-clicked();
+
+    property <color> accent: root.severity == 2 ? Theme.m3-error
+        : root.severity == 1 ? Theme.m3-tertiary
+        : Theme.m3-primary;
+    property <string> icon: root.severity == 2 ? "error"
+        : root.severity == 1 ? "warning"
+        : "info";
+
+    border-radius: Theme.m3-shape-sm;
+    background: transparent;
+
+    HorizontalLayout {
+        padding: 8px;
+        spacing: 10px;
+
+        M3Icon {
+            name: root.icon;
+            icon-size: 18px;
+            icon-color: root.accent;
+        }
+
+        VerticalLayout {
+            spacing: 1px;
+            horizontal-stretch: 1;
+
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: root.severity-label;
+                    color: root.accent;
+                    font-size: 10px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: root.title;
+                    color: Theme.m3-on-surface;
+                    font-size: 12px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                    overflow: elide;
+                }
+                Text {
+                    text: root.time;
+                    color: Theme.m3-on-surface-variant;
+                    font-size: 10px;
+                    vertical-alignment: center;
+                }
+            }
+            Text {
+                text: root.detail;
+                color: Theme.m3-on-surface-variant;
+                font-size: 11px;
+                overflow: elide;
+            }
+            Text {
+                text: "fonte: " + root.source;
+                color: Theme.m3-on-surface-variant;
+                font-size: 10px;
+                opacity: 0.8;
+            }
+        }
+
+        Rectangle {
+            width: 32px;
+            height: 32px;
+            border-radius: 16px;
+            M3Icon {
+                name: "chevron_right";
+                icon-size: 18px;
+                icon-color: Theme.m3-on-surface-variant;
+            }
+            TouchArea {
+                clicked => { root.investigate-clicked(); }
+            }
+        }
+    }
+}

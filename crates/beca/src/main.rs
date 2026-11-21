@@ -42,11 +42,84 @@ fn find_beca_daemon_pids() -> Vec<u32> {
     pids
 }
 
-fn restart_full() -> Result<()> {
-    let pids = find_beca_daemon_pids();
-    for pid in &pids {
+fn find_beca_pids_matching(pred: impl Fn(&[String]) -> bool) -> Vec<u32> {
+    let mut pids = Vec::new();
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return pids;
+    };
+    let self_pid = std::process::id();
+    for entry in entries.flatten() {
+        let Ok(pid) = entry
+            .file_name()
+            .to_str()
+            .unwrap_or("")
+            .parse::<u32>()
+        else {
+            continue;
+        };
+        if pid == self_pid {
+            continue;
+        }
+        let Ok(cmdline) = std::fs::read(entry.path().join("cmdline")) else {
+            continue;
+        };
+        let parts: Vec<String> = cmdline
+            .split(|b| *b == 0)
+            .filter(|s| !s.is_empty())
+            .map(|s| String::from_utf8_lossy(s).to_string())
+            .collect();
+        if pred(&parts) {
+            pids.push(pid);
+        }
+    }
+    pids.sort_unstable();
+    pids.dedup();
+    pids
+}
+
+fn kill_pids(pids: &[u32]) {
+    for pid in pids {
         let _ = Command::new("kill").arg(pid.to_string()).status();
     }
+}
+
+fn runtime_dir() -> PathBuf {
+    std::env::var_os("XDG_RUNTIME_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(format!("/run/user/{}", unsafe { libc_uid() })))
+        .join("beca")
+}
+
+fn libc_uid() -> u32 {
+    // fallback without libc dep
+    std::env::var("UID")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(1000)
+}
+
+fn spawn_logged(exe: &PathBuf, args: &[&str], log: &PathBuf) -> Result<()> {
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log)
+        .map_err(|e| anyhow::anyhow!("open log {}: {e}", log.display()))?;
+    let file_err = file
+        .try_clone()
+        .map_err(|e| anyhow::anyhow!("clone log {}: {e}", log.display()))?;
+    Command::new(exe)
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::from(file))
+        .stderr(std::process::Stdio::from(file_err))
+        .spawn()
+        .map_err(|e| anyhow::anyhow!("spawn {:?} {:?}: {e}", exe, args))?;
+    Ok(())
+}
+
+fn restart_full() -> Result<()> {
+    let pids = find_beca_daemon_pids();
+    kill_pids(&pids);
     if !pids.is_empty() {
         std::thread::sleep(Duration::from_millis(500));
     }
@@ -72,6 +145,75 @@ fn restart_full() -> Result<()> {
         .spawn()
         .map_err(|e| anyhow::anyhow!("failed to start daemon: {e}"))?;
     println!("{}", serde_json::json!({"ok": true, "restarted": true, "pids": pids, "mode": "daemon-only"}));
+    Ok(())
+}
+
+fn restart_local() -> Result<()> {
+    let runtime = runtime_dir();
+    std::fs::create_dir_all(&runtime).ok();
+
+    let local_mods = find_beca_pids_matching(|parts| {
+        parts.len() >= 3
+            && parts[0].rsplit('/').next().unwrap_or(&parts[0]) == "beca"
+            && parts[1] == "mod"
+            && parts[2] == "--local"
+    });
+    let daemons = find_beca_daemon_pids();
+    kill_pids(&local_mods);
+    kill_pids(&daemons);
+    if !local_mods.is_empty() || !daemons.is_empty() {
+        std::thread::sleep(Duration::from_millis(2000));
+    }
+    if let Ok(entries) = std::fs::read_dir(&runtime) {
+        for e in entries.flatten() {
+            let p = e.path();
+            if let Some(name) = p.file_name().and_then(|s| s.to_str()) {
+                if name.ends_with(".sock") || name == "launcher.ctl" || name == "voice.ctl" {
+                    let _ = std::fs::remove_file(&p);
+                }
+            }
+        }
+    }
+
+    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("beca"));
+    spawn_logged(&exe, &["daemon"], &runtime.join("daemon.log"))?;
+    std::thread::sleep(Duration::from_millis(2000));
+    spawn_logged(
+        &exe,
+        &["mod", "--local", "bar:show"],
+        &runtime.join("bar.log"),
+    )?;
+    std::thread::sleep(Duration::from_millis(1000));
+    spawn_logged(
+        &exe,
+        &["mod", "--local", "launcher:serve"],
+        &runtime.join("launcher.log"),
+    )?;
+    std::thread::sleep(Duration::from_millis(1000));
+    spawn_logged(
+        &exe,
+        &["mod", "--local", "voice:serve"],
+        &runtime.join("voice.log"),
+    )?;
+    std::thread::sleep(Duration::from_millis(2000));
+
+    let running = find_beca_pids_matching(|parts| {
+        parts.len() >= 3
+            && parts[0].rsplit('/').next().unwrap_or(&parts[0]) == "beca"
+            && parts[1] == "mod"
+            && parts[2] == "--local"
+    });
+    println!(
+        "{}",
+        serde_json::json!({
+            "ok": true,
+            "restarted": true,
+            "mode": "local",
+            "killed_local_mods": local_mods,
+            "killed_daemons": daemons,
+            "running_local_mods": running,
+        })
+    );
     Ok(())
 }
 
@@ -118,6 +260,21 @@ fn main() -> Result<()> {
         }
         cli::Commands::Run { script, args } => comandos::runner::run_script(&script, &args),
         cli::Commands::Config { action } => match action {
+            cli::ConfigAction::Init { force } => {
+                let paths = beca_core::config::BecaPaths::resolve();
+                let created = beca_core::config::ensure_defaults_with_paths(&paths, force)
+                    .map_err(|e| anyhow::anyhow!(e))?;
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "ok": true,
+                        "config_dir": paths.config_dir,
+                        "created": created,
+                        "force": force,
+                    })
+                );
+                Ok(())
+            }
             cli::ConfigAction::Reload => {
                 let resp = daemon::send_request(&serde_json::json!({"type":"config.reload"}))?;
                 println!("{}", serde_json::to_string(&resp)?);
@@ -163,6 +320,12 @@ fn main() -> Result<()> {
             }
             Ok(())
         }
-        cli::Commands::Restart => restart_full(),
+        cli::Commands::Restart { local } => {
+            if local {
+                restart_local()
+            } else {
+                restart_full()
+            }
+        }
     }
 }

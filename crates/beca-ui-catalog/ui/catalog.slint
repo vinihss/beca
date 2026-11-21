@@ -1,5 +1,5 @@
 import { VerticalBox, HorizontalBox, ScrollView } from "std-widgets.slint";
-import { Theme, IconButton, PillButton, MediaButton, DesktopButton, InfoCard } from "../../beca-ui/ui/library.slint";
+import { Theme, IconButton, PillButton, MediaButton, DesktopButton, InfoCard, M3MetricCard, M3MetricCardVariant, M3MetricTrend, M3TopAppBar } from "../../beca-ui/ui/library.slint";
 
 export component CatalogWindow inherits Window {
     title: "beca-ui catalog";
@@ -7,13 +7,18 @@ export component CatalogWindow inherits Window {
     preferred-height: 720px;
     background: Theme.m3-background;
 
-    ScrollView {
+    // Emitted by the top-bar dashboard icon; the Rust host shows the full AppWindow panel.
+    callback open_panel();
+
+    scroll := ScrollView {
+        y: 64px;
+        height: root.height - 64px;
         VerticalBox {
             padding: 24px;
             spacing: 20px;
 
             Text {
-                text: "beca-ui catalog — M3 purple baseline";
+                text: "M3 purple baseline — stories";
                 font-size: 24px;
                 font-weight: 700;
                 color: Theme.m3-on-background;
@@ -82,6 +87,60 @@ export component CatalogWindow inherits Window {
                     InfoCard { title: "Nested card"; outlined: true; Text { text: "Content using M3 surface/outline tokens."; color: Theme.m3-on-surface-variant; } }
                 }
             }
+
+            metric-section := InfoCard {
+                title: "M3MetricCard";
+                VerticalBox {
+                    spacing: 16px;
+                    Text { text: "Variantes"; color: Theme.m3-on-surface-variant; font-weight: 600; }
+                    HorizontalBox { spacing: 12px; alignment: start;
+                        M3MetricCard { width: 220px; heading: "CPU por núcleo"; value: "23%"; detail: "8 núcleos · demo"; }
+                        M3MetricCard { width: 220px; variant: M3MetricCardVariant.outlined; heading: "Memória"; value: "8,4 / 32 GB"; detail: "26% usado"; trend: M3MetricTrend.up; trend-text: "+2%"; }
+                        M3MetricCard { width: 220px; variant: M3MetricCardVariant.elevated; heading: "Temperatura"; value: "54 °C"; detail: "sensor disponível"; progress-visible: true; progress: 0.54; }
+                    }
+                    Text { text: "Trend, ícone e interação"; color: Theme.m3-on-surface-variant; font-weight: 600; }
+                    HorizontalBox { spacing: 12px; alignment: start;
+                        M3MetricCard { width: 220px; heading: "Rede"; value: "wlan0"; detail: "↓ 12,4 Mb/s"; icon: "monitoring"; trend: M3MetricTrend.flat; trend-text: "estável"; }
+                        M3MetricCard { width: 220px; heading: "Disco"; value: "/ 68%"; detail: "/home 34% usado"; trend: M3MetricTrend.down; trend-text: "−3%"; }
+                        M3MetricCard { width: 220px; heading: "Tema"; value: "M3"; detail: "clique para alternar escuro/claro"; clickable: true; clicked => { Theme.dark-mode = !Theme.dark-mode; } }
+                    }
+                }
+            }
+
+            panel-section := InfoCard {
+                title: "M3MetricCard — painel";
+                VerticalBox {
+                    spacing: 12px;
+                    Text { text: "Preview do kit: o ícone \"dashboard\" da barra superior abre o painel completo (AppWindow) em janela própria; o app standalone é `cargo run -p beca-panel`."; color: Theme.m3-on-surface-variant; font-size: 12px; }
+                    HorizontalBox { spacing: 8px; alignment: start;
+                        M3MetricCard { horizontal-stretch: 1; heading: "CPU"; value: "23%"; detail: "8 núcleos"; }
+                        M3MetricCard { horizontal-stretch: 1; variant: M3MetricCardVariant.outlined; heading: "Memória"; value: "8,4 GB"; detail: "26% usado"; }
+                        M3MetricCard { horizontal-stretch: 1; variant: M3MetricCardVariant.elevated; heading: "Disco"; value: "68%"; detail: "/home"; progress-visible: true; progress: 0.68; }
+                        M3MetricCard { horizontal-stretch: 1; heading: "Rede"; value: "wlan0"; detail: "12,4 Mb/s"; }
+                    }
+                }
+            }
         }
+    }
+
+    // Fixed top app bar: the dashboard icon opens the metric panel built from M3MetricCard.
+    M3TopAppBar {
+        y: 0;
+        background: Theme.m3-surface-container;
+        title: "beca-ui catalog";
+        show-navigation: false;
+        actions: ["dashboard"];
+        action-clicked(idx) => {
+            if (idx == 0) {
+                root.open_panel();
+            }
+        }
+    }
+
+    // Hairline between the fixed app bar and the scrolling content.
+    Rectangle {
+        x: 0; y: 63px;
+        width: root.width; height: 1px;
+        background: Theme.m3-outline-variant;
     }
 }

@@ -6,6 +6,7 @@ members = [
     "crates/beca-apps",
     "crates/beca-ui",
     "crates/beca-ui-catalog",
+    "crates/beca-panel",
     "crates/beca-layer-shell",
 ]
 

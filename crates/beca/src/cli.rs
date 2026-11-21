@@ -44,13 +44,23 @@ pub enum Commands {
 
     Subscribe,
 
-    Restart,
+    Restart {
+        /// Stop and relaunch daemon + bar/launcher/voice as local module processes
+        #[arg(long)]
+        local: bool,
+    },
 }
 
 #[derive(Subcommand)]
 pub enum ConfigAction {
 
     Reload,
+
+    Init {
+
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 pub fn parse_target(target: &str) -> anyhow::Result<(String, String)> {

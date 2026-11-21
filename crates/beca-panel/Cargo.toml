@@ -1,0 +1,11 @@
+[package]
+name = "beca-panel"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+beca-ui = { path = "../beca-ui" }
+slint.workspace = true
+
+[build-dependencies]
+slint-build.workspace = true

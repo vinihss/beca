@@ -1,0 +1,254 @@
+import { ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { M3MetricCard } from "../components/metric_card.slint";
+import { PanelSidebar } from "components/sidebar.slint";
+import { PanelPageHeader } from "components/page_header.slint";
+import { PanelHealthBanner } from "components/health_banner.slint";
+import { PanelCard } from "components/panel_card.slint";
+import {
+    PanelCpuCard, PanelMemoryCard, PanelStorageCard, PanelNetworkCard, PanelTemperatureCard,
+} from "components/metric_cards.slint";
+import { PanelAlertRow } from "components/alert_row.slint";
+import { PanelServiceRow } from "components/service_row.slint";
+import { PanelNavEntry, PanelCore, PanelVolume, PanelAlert, PanelService, PanelSummary } from "models.slint";
+
+// Overview window: fixed sidebar, page header, health band, metric band,
+// recent alerts + critical services and the summary cards.
+export component AppWindow inherits Window {
+    title: "beca — painel";
+    preferred-width: 1400px;
+    preferred-height: 900px;
+    min-width: 1024px;
+    min-height: 640px;
+    background: Theme.m3-background;
+
+    in-out property <int> selected-page: 0;
+    in-out property <[PanelNavEntry]> nav-entries: [
+        { icon: "dashboard", selected-icon: "dashboard", label: "Visão geral", badge: "" },
+        { icon: "computer", selected-icon: "computer", label: "Sistema", badge: "" },
+        { icon: "memory", selected-icon: "memory", label: "Hardware", badge: "" },
+        { icon: "list_alt", selected-icon: "list_alt", label: "Processos", badge: "" },
+        { icon: "settings_applications", selected-icon: "settings_applications", label: "Serviços", badge: "" },
+        { icon: "notification_important", selected-icon: "notification_important", label: "Alertas", badge: "3" },
+        { icon: "receipt_long", selected-icon: "receipt_long", label: "Logs", badge: "" },
+        { icon: "system_update_alt", selected-icon: "system_update_alt", label: "Atualizações", badge: "12" },
+        { icon: "lightbulb", selected-icon: "lightbulb", label: "Insights", badge: "" },
+        { icon: "troubleshoot", selected-icon: "troubleshoot", label: "Diagnósticos", badge: "" },
+        { icon: "newspaper", selected-icon: "newspaper", label: "Notícias", badge: "" },
+        { icon: "calendar_month", selected-icon: "calendar_month", label: "Agenda", badge: "" },
+        { icon: "settings", selected-icon: "settings", label: "Configurações", badge: "" },
+    ];
+
+    // Demo snapshot. The Rust collector replaces these with real readings.
+    in-out property <string> health-title: "Sistema saudável";
+    in-out property <string> health-reason: "CPU, memória, armazenamento e temperatura dentro dos limites configurados.";
+    in-out property <string> health-evaluated-at: "avaliado às 12:04";
+    in-out property <int> health-severity: 0;
+
+    in-out property <[PanelCore]> cores: [
+        { label: "cpu0", percent: 18, percent-text: "18%" },
+        { label: "cpu1", percent: 24, percent-text: "24%" },
+        { label: "cpu2", percent: 12, percent-text: "12%" },
+        { label: "cpu3", percent: 31, percent-text: "31%" },
+        { label: "cpu4", percent: 44, percent-text: "44%" },
+        { label: "cpu5", percent: 9, percent-text: "9%" },
+        { label: "cpu6", percent: 27, percent-text: "27%" },
+        { label: "cpu7", percent: 19, percent-text: "19%" },
+    ];
+    in-out property <string> cpu-total: "23%";
+
+    in-out property <[PanelVolume]> volumes: [
+        { mount: "/", usage: "118 / 174 GB", percent: 0.68, percent-text: "68%", note: "56 GB livres" },
+        { mount: "/home", usage: "412 / 764 GB", percent: 0.54, percent-text: "54%", note: "352 GB livres" },
+        { mount: "/mnt/dados", usage: "1,7 / 1,8 TB", percent: 0.94, percent-text: "94%", note: "108 GB livres · acima do limite" },
+    ];
+
+    in-out property <[PanelAlert]> alerts: [
+        {
+            severity: 2,
+            severity-label: "Crítico",
+            title: "/mnt/dados acima de 94%",
+            detail: "108 GB livres · limite configurado em 90%",
+            time: "12:03",
+            source: "storage",
+        },
+        {
+            severity: 1,
+            severity-label: "Atenção",
+            title: "fstrim.timer falhou",
+            detail: "última execução em 11:40 · código 1",
+            time: "11:41",
+            source: "systemd",
+        },
+        {
+            severity: 0,
+            severity-label: "Info",
+            title: "12 atualizações disponíveis",
+            detail: "kernel e systemd incluídos · nada foi instalado",
+            time: "11:20",
+            source: "pacman",
+        },
+    ];
+
+    in-out property <[PanelService]> critical-services: [
+        { name: "systemd-journald", description: "Journal do sistema", state: "active", state-label: "Ativo" },
+        { name: "NetworkManager", description: "Gerenciador de rede", state: "active", state-label: "Ativo" },
+        { name: "fstrim.timer", description: "TRIM semanal dos SSDs", state: "failed", state-label: "Falhou" },
+    ];
+
+    in-out property <[PanelSummary]> summaries: [
+        { icon: "system_update_alt", title: "Atualizações", value: "12", detail: "verificado 11:20 · revisar antes de aplicar", action: "Revisar" },
+        { icon: "lightbulb", title: "Insights", value: "2", detail: "cache em uso alto · analisado 11:45", action: "Ver" },
+        { icon: "dark_mode", title: "Lua do dia", value: "Crescente", detail: "gibosa · iluminação 72%", action: "Detalhes" },
+        { icon: "event", title: "Próximo compromisso", value: "14:30", detail: "revisão de infraestrutura · sala 2", action: "Agenda" },
+    ];
+
+    callback page-selected(int);
+    callback alert-selected(int);
+    callback service-selected(int);
+    callback summary-selected(int);
+    callback health-details-clicked();
+    callback refresh-requested();
+    callback close-requested();
+
+    HorizontalLayout {
+        spacing: 0px;
+
+        PanelSidebar {
+            entries: root.nav-entries;
+            selected-index: root.selected-page;
+            entry-selected(idx) => {
+                root.selected-page = idx;
+                root.page-selected(idx);
+            }
+        }
+
+        Rectangle {
+            width: 1px;
+            background: Theme.m3-outline-variant;
+        }
+
+        VerticalLayout {
+            spacing: 0px;
+            horizontal-stretch: 1;
+
+            PanelPageHeader {
+                title: root.nav-entries[clamp(root.selected-page, 0, root.nav-entries.length - 1)].label;
+                subtitle: "Arch Linux · Hyprland · kernel 6.12";
+                clock: "12:04";
+                refresh-clicked => { root.refresh-requested(); }
+                close-clicked => { root.close-requested(); }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: Theme.m3-outline-variant;
+            }
+
+            ScrollView {
+                VerticalLayout {
+                    padding: 20px;
+                    spacing: 14px;
+                    min-width: 760px;
+
+                    PanelHealthBanner {
+                        severity: root.health-severity;
+                        title: root.health-title;
+                        reason: root.health-reason;
+                        evaluated-at: root.health-evaluated-at;
+                        details-clicked => { root.health-details-clicked(); }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 14px;
+                        PanelCpuCard {
+                            horizontal-stretch: 2;
+                            min-width: 360px;
+                            cores: root.cores;
+                            total: root.cpu-total;
+                        }
+                        PanelMemoryCard {
+                            horizontal-stretch: 1;
+                            min-width: 220px;
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 14px;
+                        PanelStorageCard {
+                            horizontal-stretch: 2;
+                            min-width: 360px;
+                            volumes: root.volumes;
+                        }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            min-width: 220px;
+                            spacing: 14px;
+                            PanelNetworkCard { horizontal-stretch: 1; }
+                            PanelTemperatureCard { horizontal-stretch: 1; }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 14px;
+
+                        PanelCard {
+                            horizontal-stretch: 2;
+                            min-width: 400px;
+                            title: "Alertas recentes";
+                            icon: "notification_important";
+                            trailing: root.alerts.length + " abertos · ver todos";
+                            outlined: true;
+
+                            for alert[idx] in root.alerts : PanelAlertRow {
+                                severity: alert.severity;
+                                severity-label: alert.severity-label;
+                                title: alert.title;
+                                detail: alert.detail;
+                                time: alert.time;
+                                source: alert.source;
+                                investigate-clicked => { root.alert-selected(idx); }
+                            }
+                        }
+
+                        PanelCard {
+                            horizontal-stretch: 1;
+                            min-width: 260px;
+                            title: "Serviços críticos";
+                            icon: "dns";
+                            trailing: "configuráveis";
+
+                            for service[idx] in root.critical-services : PanelServiceRow {
+                                name: service.name;
+                                description: service.description;
+                                state: service.state;
+                                state-label: service.state-label;
+                                details-clicked => { root.service-selected(idx); }
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 14px;
+                        for summary[idx] in root.summaries : M3MetricCard {
+                            horizontal-stretch: 1;
+                            min-width: 170px;
+                            clickable: true;
+                            icon: summary.icon;
+                            heading: summary.title;
+                            value: summary.value;
+                            detail: summary.detail;
+                            clicked => { root.summary-selected(idx); }
+                        }
+                    }
+
+                    Text {
+                        text: "Dados de demonstração — nenhuma coleta real nesta fase.";
+                        color: Theme.m3-on-surface-variant;
+                        font-size: 10px;
+                    }
+                }
+            }
+        }
+    }
+}

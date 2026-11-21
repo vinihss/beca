@@ -585,6 +585,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "beca-panel"
+version = "0.1.0"
+dependencies = [
+ "beca-ui",
+ "slint",
+ "slint-build",
+]
+
+[[package]]
 name = "beca-ui"
 version = "0.1.0"
 dependencies = [

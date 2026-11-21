@@ -1,0 +1,116 @@
+import { Theme } from "../theme.slint";
+import { M3Icon } from "icon.slint";
+import { M3LinearProgress } from "progress.slint";
+
+export enum M3MetricCardVariant { filled, outlined, elevated }
+export enum M3MetricTrend { none, up, down, flat }
+
+// Material 3 metric card: label, value and supporting detail with an optional
+// icon, trend indicator and progress bar.
+export component M3MetricCard inherits Rectangle {
+    in property <M3MetricCardVariant> variant: M3MetricCardVariant.filled;
+    in property <string> heading: "";
+    in property <string> value: "";
+    in property <string> detail: "";
+    in property <string> icon: "";
+    in property <M3MetricTrend> trend: M3MetricTrend.none;
+    in property <string> trend-text: "";
+    in property <bool> progress-visible: false;
+    in property <float> progress: 0.0;
+    in property <bool> clickable: false;
+    callback clicked;
+
+    property <color> trend-color: root.trend == M3MetricTrend.up ? Theme.m3-tertiary
+        : root.trend == M3MetricTrend.down ? Theme.m3-error
+        : Theme.m3-on-surface-variant;
+
+    min-width: 160px;
+    min-height: 112px;
+    border-radius: Theme.m3-shape-md;
+    background: root.variant == M3MetricCardVariant.filled ? Theme.m3-surface-container-highest
+        : root.variant == M3MetricCardVariant.outlined ? Theme.m3-surface
+        : Theme.m3-surface-container-low;
+    border-width: root.variant == M3MetricCardVariant.outlined ? 1px : 0px;
+    border-color: Theme.m3-outline-variant;
+    drop-shadow-blur: root.variant == M3MetricCardVariant.elevated ? 3px : 0px;
+    drop-shadow-color: #00000040;
+
+    state-layer := Rectangle {
+        border-radius: parent.border-radius;
+        background: touch.pressed ? Theme.m3-on-surface
+            : touch.has-hover ? Theme.m3-on-surface : transparent;
+        opacity: root.clickable
+            ? (touch.pressed ? Theme.m3-state-pressed : touch.has-hover ? Theme.m3-state-hover : 0)
+            : 0;
+    }
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+
+        HorizontalLayout {
+            spacing: 6px;
+            if root.icon != "" : M3Icon {
+                name: root.icon;
+                icon-size: 20px;
+                icon-color: Theme.m3-on-surface-variant;
+            }
+            Text {
+                text: root.heading;
+                color: Theme.m3-on-surface-variant;
+                font-size: 12px;
+                font-weight: 500;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+
+        VerticalLayout {
+            spacing: 4px;
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: root.value;
+                    color: Theme.m3-on-surface;
+                    font-size: 24px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+                if root.trend != M3MetricTrend.none : Text {
+                    text: root.trend == M3MetricTrend.up ? "↑" : root.trend == M3MetricTrend.down ? "↓" : "—";
+                    color: root.trend-color;
+                    font-size: 12px;
+                    font-weight: 500;
+                    vertical-alignment: center;
+                }
+                if root.trend-text != "" : Text {
+                    text: root.trend-text;
+                    color: root.trend-color;
+                    font-size: 12px;
+                    font-weight: 500;
+                    vertical-alignment: center;
+                }
+            }
+            if root.detail != "" : Text {
+                text: root.detail;
+                color: Theme.m3-on-surface-variant;
+                font-size: 14px;
+                font-weight: 400;
+                wrap: word-wrap;
+            }
+        }
+
+        if root.progress-visible : M3LinearProgress {
+            progress: clamp(root.progress, 0, 1);
+            bar-height: 4px;
+        }
+
+        @children
+    }
+
+    touch := TouchArea {
+        enabled: root.clickable;
+        mouse-cursor: root.clickable ? pointer : default;
+        clicked => { root.clicked(); }
+    }
+}

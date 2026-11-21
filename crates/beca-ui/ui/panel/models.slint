@@ -1,0 +1,47 @@
+// Data shapes for the system panel. The Rust side will fill these from a
+// snapshot; the defaults here are demo values for the static phase.
+
+export struct PanelNavEntry {
+    icon: string,
+    selected-icon: string,
+    label: string,
+    badge: string,
+}
+
+export struct PanelCore {
+    label: string,
+    percent: float,
+    percent-text: string,
+}
+
+export struct PanelVolume {
+    mount: string,
+    usage: string,
+    percent: float,
+    percent-text: string,
+    note: string,
+}
+
+export struct PanelAlert {
+    severity: int, // 0 = info, 1 = warning, 2 = critical
+    severity-label: string,
+    title: string,
+    detail: string,
+    time: string,
+    source: string,
+}
+
+export struct PanelService {
+    name: string,
+    description: string,
+    state: string, // active | failed | inactive | unknown
+    state-label: string,
+}
+
+export struct PanelSummary {
+    icon: string,
+    title: string,
+    value: string,
+    detail: string,
+    action: string,
+}

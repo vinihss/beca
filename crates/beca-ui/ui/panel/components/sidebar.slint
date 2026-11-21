@@ -1,0 +1,108 @@
+import { Theme } from "../../theme.slint";
+import { M3Icon } from "../../components/icon.slint";
+import { PanelNavEntry } from "../models.slint";
+
+// Fixed identity + navigation column for the panel shell.
+export component PanelSidebar inherits Rectangle {
+    in property <string> app-name: "beca";
+    in property <string> app-subtitle: "painel do sistema";
+    in property <[PanelNavEntry]> entries: [];
+    in-out property <int> selected-index: 0;
+    callback entry-selected(int);
+
+    width: 232px;
+    background: Theme.m3-surface-container-low;
+
+    VerticalLayout {
+        padding-top: 16px;
+        padding-bottom: 12px;
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 2px;
+
+        HorizontalLayout {
+            spacing: 10px;
+            padding-left: 8px;
+            padding-right: 8px;
+            padding-bottom: 10px;
+
+            Rectangle {
+                width: 32px;
+                height: 32px;
+                border-radius: Theme.m3-shape-sm;
+                background: Theme.m3-primary-container;
+                M3Icon {
+                    name: "monitoring";
+                    icon-size: 20px;
+                    icon-color: Theme.m3-on-primary-container;
+                }
+            }
+            VerticalLayout {
+                spacing: 0px;
+                Text {
+                    text: root.app-name;
+                    color: Theme.m3-on-surface;
+                    font-size: 16px;
+                    font-weight: 700;
+                }
+                Text {
+                    text: root.app-subtitle;
+                    color: Theme.m3-on-surface-variant;
+                    font-size: 10px;
+                }
+            }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: Theme.m3-outline-variant;
+        }
+
+        for entry[idx] in root.entries : Rectangle {
+            height: 36px;
+            border-radius: Theme.m3-shape-sm;
+            background: idx == root.selected-index ? Theme.m3-secondary-container : transparent;
+
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 10px;
+                spacing: 10px;
+
+                M3Icon {
+                    name: idx == root.selected-index && entry.selected-icon != ""
+                        ? entry.selected-icon : entry.icon;
+                    icon-size: 18px;
+                    icon-color: idx == root.selected-index
+                        ? Theme.m3-on-secondary-container : Theme.m3-on-surface-variant;
+                }
+                Text {
+                    text: entry.label;
+                    color: idx == root.selected-index
+                        ? Theme.m3-on-secondary-container : Theme.m3-on-surface;
+                    font-size: 13px;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                    overflow: elide;
+                }
+                if entry.badge != "" : Rectangle {
+                    height: 18px;
+                    min-width: 18px;
+                    border-radius: 9px;
+                    background: Theme.m3-error;
+                    Text {
+                        text: entry.badge;
+                        color: Theme.m3-on-error;
+                        font-size: 10px;
+                        font-weight: 600;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            TouchArea {
+                clicked => { root.entry-selected(idx); }
+            }
+        }
+    }
+}

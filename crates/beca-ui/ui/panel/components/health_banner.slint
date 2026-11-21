@@ -1,0 +1,85 @@
+import { Theme } from "../../theme.slint";
+import { M3Icon } from "../../components/icon.slint";
+
+// Overall state, its reason, when it was last evaluated and a details action.
+// Healthy uses the tertiary role: M3 has no semantic success role.
+export component PanelHealthBanner inherits Rectangle {
+    in property <int> severity: 0; // 0 = healthy, 1 = attention, 2 = critical
+    in property <string> title: "Sistema saudável";
+    in property <string> reason: "Nenhum limiar excedido nas últimas 24 horas.";
+    in property <string> evaluated-at: "avaliado às 12:04";
+    in property <string> action-label: "Detalhes";
+    callback details-clicked();
+
+    property <color> accent: root.severity == 2 ? Theme.m3-error
+        : root.severity == 1 ? Theme.m3-tertiary
+        : Theme.m3-tertiary;
+
+    property <string> icon: root.severity == 2 ? "error"
+        : root.severity == 1 ? "warning"
+        : "check_circle";
+
+    border-radius: Theme.m3-shape-md;
+    background: Theme.m3-surface-container;
+    border-width: 1px;
+    border-color: Theme.m3-outline-variant;
+
+    HorizontalLayout {
+        padding: 16px;
+        spacing: 12px;
+
+        M3Icon {
+            name: root.icon;
+            icon-size: 24px;
+            icon-color: root.accent;
+        }
+
+        VerticalLayout {
+            spacing: 2px;
+            horizontal-stretch: 1;
+
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: root.title;
+                    color: Theme.m3-on-surface;
+                    font-size: 15px;
+                    font-weight: 600;
+                }
+                Text {
+                    text: root.evaluated-at;
+                    color: Theme.m3-on-surface-variant;
+                    font-size: 11px;
+                    vertical-alignment: center;
+                }
+            }
+            Text {
+                text: root.reason;
+                color: Theme.m3-on-surface-variant;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+        }
+
+        Rectangle {
+            height: 32px;
+            border-radius: Theme.m3-shape-sm;
+            background: Theme.m3-surface-container-highest;
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                alignment: center;
+                Text {
+                    text: root.action-label;
+                    color: Theme.m3-primary;
+                    font-size: 12px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+            }
+            TouchArea {
+                clicked => { root.details-clicked(); }
+            }
+        }
+    }
+}

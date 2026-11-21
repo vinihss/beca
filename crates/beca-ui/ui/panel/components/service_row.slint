@@ -1,0 +1,71 @@
+import { Theme } from "../../theme.slint";
+import { M3Icon } from "../../components/icon.slint";
+
+// One critical service line: name, short description and typed state.
+export component PanelServiceRow inherits Rectangle {
+    in property <string> name: "";
+    in property <string> description: "";
+    in property <string> state: "unknown";
+    in property <string> state-label: "Desconhecido";
+    callback details-clicked();
+
+    property <color> state-color: root.state == "active" ? Theme.m3-tertiary
+        : root.state == "failed" ? Theme.m3-error
+        : Theme.m3-on-surface-variant;
+
+    border-radius: Theme.m3-shape-sm;
+    background: transparent;
+
+    HorizontalLayout {
+        padding: 8px;
+        spacing: 10px;
+
+        Rectangle {
+            width: 8px;
+            height: 8px;
+            border-radius: 4px;
+            background: root.state-color;
+        }
+
+        VerticalLayout {
+            spacing: 1px;
+            horizontal-stretch: 1;
+
+            Text {
+                text: root.name;
+                color: Theme.m3-on-surface;
+                font-size: 12px;
+                font-weight: 600;
+                overflow: elide;
+            }
+            Text {
+                text: root.description;
+                color: Theme.m3-on-surface-variant;
+                font-size: 10px;
+                overflow: elide;
+            }
+        }
+
+        Text {
+            text: root.state-label;
+            color: root.state-color;
+            font-size: 10px;
+            font-weight: 700;
+            vertical-alignment: center;
+        }
+
+        Rectangle {
+            width: 28px;
+            height: 28px;
+            border-radius: 14px;
+            M3Icon {
+                name: "chevron_right";
+                icon-size: 16px;
+                icon-color: Theme.m3-on-surface-variant;
+            }
+            TouchArea {
+                clicked => { root.details-clicked(); }
+            }
+        }
+    }
+}

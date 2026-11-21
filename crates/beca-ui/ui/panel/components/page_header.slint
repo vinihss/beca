@@ -1,0 +1,92 @@
+import { Theme } from "../../theme.slint";
+import { M3Icon } from "../../components/icon.slint";
+
+// Page title, context line, clock and session state.
+export component PanelPageHeader inherits Rectangle {
+    in property <string> title: "Visão geral";
+    in property <string> subtitle: "Arch Linux · Hyprland";
+    in property <string> clock: "12:04";
+    in property <string> session-label: "sessão ativa";
+    callback refresh-clicked();
+    callback close-clicked();
+
+    height: 72px;
+    background: Theme.m3-surface;
+
+    HorizontalLayout {
+        padding-left: 24px;
+        padding-right: 16px;
+        spacing: 12px;
+
+        VerticalLayout {
+            spacing: 2px;
+            alignment: center;
+            horizontal-stretch: 1;
+
+            Text {
+                text: root.title;
+                color: Theme.m3-on-surface;
+                font-size: 22px;
+                font-weight: 600;
+            }
+            Text {
+                text: root.subtitle;
+                color: Theme.m3-on-surface-variant;
+                font-size: 12px;
+            }
+        }
+
+        Rectangle {
+            height: 28px;
+            min-width: 132px;
+            border-radius: Theme.m3-shape-sm;
+            background: Theme.m3-surface-container-high;
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 10px;
+                spacing: 6px;
+                alignment: center;
+                Rectangle {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 4px;
+                    background: Theme.m3-tertiary;
+                }
+                Text {
+                    text: root.session-label;
+                    color: Theme.m3-on-surface-variant;
+                    font-size: 11px;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        Text {
+            text: root.clock;
+            color: Theme.m3-on-surface;
+            font-size: 16px;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+
+        for action[idx] in ["refresh", "close"] : Rectangle {
+            width: 40px;
+            height: 40px;
+            border-radius: 20px;
+            M3Icon {
+                name: idx == 0 ? "refresh" : "close";
+                icon-size: 20px;
+                icon-color: Theme.m3-on-surface-variant;
+            }
+            TouchArea {
+                clicked => {
+                    if (idx == 0) {
+                        root.refresh-clicked();
+                    } else {
+                        root.close-clicked();
+                    }
+                }
+            }
+        }
+    }
+}

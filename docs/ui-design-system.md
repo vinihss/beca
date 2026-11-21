@@ -337,6 +337,7 @@ Arquivo: **“Plugins for Dev Mode Playground (Copy)”**, página **“Beca”*
   - **03 — Identity:** M3 baseline roxo vs adaptado ao beca.
   - **04 — M3 Components (ref, kit):** Switch, Tabs (Primary), Top App Bar, Navigation Bar, Search, Text Field (Filled/Outlined), Slider, Checkbox & Radio, List, Navigation Rail, Dialog & Snackbar, Progress & Segmented, Menu & Tooltip.
   - **05 — Patterns (Beca):** Configuração (rail + aparência/modo/seed/toggles), Voice (orb idle/ouvindo/processando/falando + HUD), Launcher (search + resultados + hints), Barra (top/bottom, widgets), Painel (quick settings + sliders + notificações).
+  - **06 — MetricCard (beca-ui):** showcase do componente `M3MetricCard` (variantes, estados, especificação e composição em painel), node `520:2`.
 
 ### 12.3 Mapeamento M3 → contrato do beca (guia para implementação)
 
@@ -374,3 +375,90 @@ Arquivo: **“Plugins for Dev Mode Playground (Copy)”**, página **“Beca”*
 |---|---|---|
 | D4 | **Design system:** adotar **Material 3 baseline roxo (#6750A4)** como referência de tokens/componentes/padrões, com adaptação ao contexto do beca. | Confirmado |
 | D5 | **Artefato de design:** Figma (página Beca) como protótipo vivo de foundations/componentes/padrões M3; catálogo Slint (`beca-ui-catalog`) permanece a fonte de verdade alinhada ao código. | Confirmado |
+
+### 12.6 Contrato implementado — `M3MetricCard` (13 nov 2026)
+
+Card de métrica derivado do painel de referência (`nexus-panel-starter/ui/components/metric-card.slint`) e traduzido para os roles M3 do beca. É o átomo de dashboard (CPU, memória, disco, rede, temperatura) com variantes de superfície, trend semântico e progresso opcional.
+
+**Arquivos**
+
+| Caminho | Papel |
+|---|---|
+| `crates/beca-ui/ui/components/metric_card.slint` | Implementação (`M3MetricCard`, `M3MetricCardVariant`, `M3MetricTrend`) |
+| `crates/beca-ui/ui/library.slint` | Export público (`M3MetricCard`, `M3MetricCardVariant`, `M3MetricTrend`) |
+| `crates/beca-ui/ui/panel/app_window.slint` | Janela `AppWindow` (shell: sidebar + cabeçalho + saúde + métricas + eventos + resumos) |
+| `crates/beca-ui/ui/panel/models.slint` | Structs de dados do painel (`PanelNavEntry`, `PanelCore`, `PanelVolume`, `PanelAlert`, `PanelService`, `PanelSummary`) |
+| `crates/beca-ui/ui/panel/components/*.slint` | `PanelSidebar`, `PanelPageHeader`, `PanelHealthBanner`, `PanelCard`, `PanelCpuCard`, `PanelMemoryCard`, `PanelStorageCard`, `PanelNetworkCard`, `PanelTemperatureCard`, `PanelAlertRow`, `PanelServiceRow` |
+| `crates/beca-ui/ui/library.slint` | Export público (`AppWindow`) |
+| `crates/beca-ui-catalog/ui/catalog.slint` | Top app bar fixa + stories "M3MetricCard" (variantes, trend/ícone/interação) e "M3MetricCard — painel" (preview da composição) |
+| `crates/beca-panel` | App do painel: binário próprio (`cargo run -p beca-panel`) que abre a janela sozinho |
+| `crates/beca-ui-catalog/src/main.rs` | Host de vitrine: o ícone `dashboard` abre/reusa a `AppWindow` |
+| Figma (página Beca) | Showcase `06 — MetricCard (beca-ui)`, node `520:2` |
+
+**API**
+
+| Item | Tipo | Default | Nota |
+|---|---|---|---|
+| `variant` | `M3MetricCardVariant { filled, outlined, elevated }` | `filled` | superfície do container |
+| `heading` | `string` | `""` | rótulo 12 / 500 `on-surface-variant` |
+| `value` | `string` | `""` | valor 24 / 600 `on-surface` |
+| `detail` | `string` | `""` | suporte 14 / 400 `on-surface-variant`, word-wrap |
+| `icon` | `string` | `""` | `M3Icon` 20dp opcional, cor `on-surface-variant` |
+| `trend` | `M3MetricTrend { none, up, down, flat }` | `none` | glifo `↑` / `↓` / `—` (sem emoji) |
+| `trend-text` | `string` | `""` | 12 / 500 na cor do trend |
+| `progress-visible` + `progress` | `bool` / `float 0..1` | `false` / `0.0` | `M3LinearProgress` 4dp, valor com `clamp` |
+| `clickable` + `clicked()` | `bool` / callback | `false` | state layer como `M3Card` |
+| — | `@children` | — | slot de rodapé/ações |
+
+**Tokens M3 usados**
+
+| Elemento | Token |
+|---|---|
+| filled | `m3-surface-container-highest` |
+| outlined | `m3-surface` + `m3-outline-variant` 1dp |
+| elevated | `m3-surface-container-low` + `drop-shadow-blur: 3px` `#00000040` |
+| raio / padding / gaps | `m3-shape-md` (12) / 16 / 8 (4 entre heading e value) |
+| trend up / down / flat | `m3-tertiary` / `m3-error` / `m3-on-surface-variant` |
+| progresso | `M3LinearProgress` (track/indicador já em primary) |
+| interação | state layer `on-surface` hover 8% / pressed 10%, cursor pointer, foco `primary` |
+| medidas mínimas | 160 × 112 dp |
+
+**Navegação no catálogo**
+
+- `M3TopAppBar` fixa (64dp) com `background: m3-surface-container` + hairline `m3-outline-variant`: o `surface` padrão é igual ao `background` da página e a barra ficava invisível.
+- Ação `dashboard` (`actions: ["dashboard"]` → `action-clicked(0)`) emite `root.open_panel()`; não há scroll automático.
+- `crates/beca-ui-catalog/src/main.rs` trata `open_panel`: cria (ou reexibe) uma única `AppWindow` e a mantém viva enquanto o catálogo existir.
+- `close_requested` apenas esconde a janela; o próximo clique no ícone reusa a mesma instância (sem empilhar janelas).
+- A story `panel-section := InfoCard` permanece no catálogo como **preview estático** da mesma composição, com nota apontando para a janela.
+
+**Painel — `AppWindow` (fase 1 da spec de implementação)**
+
+Estrutura seguindo `AppWindow → sidebar + conteúdo` (spec `implementacao-painel-nexus.md`, fase 1: shell estático com dados falsos).
+
+- **App próprio:** `cargo run -p beca-panel` (crate `crates/beca-panel`; `ui/panel.slint` só reexporta `AppWindow`; `close_requested` encerra o app).
+- **Vitrine:** o ícone `dashboard` do catálogo abre a janela em processo e reusa a instância ao reabrir.
+
+| Item | Valor |
+|---|---|
+| arquivo | `crates/beca-ui/ui/panel/app_window.slint` |
+| título / tamanho | `beca — painel` / `1400 × 900` (mín. `1024 × 640`) |
+| coluna lateral | 232dp, `m3-surface-container-low`, identidade + 13 destinos (Visão geral … Configurações) com badge em Alertas (3) e Atualizações (12) |
+| cabeçalho | 72dp `m3-surface`: título da página ativa, "Arch Linux · Hyprland · kernel 6.12", chip de sessão com ponto `m3-tertiary`, relógio, ações `refresh`/`close` |
+| faixa de saúde | `PanelHealthBanner` em `m3-surface-container` + `m3-outline-variant`: ícone/estado, motivo, horário da avaliação e ação "Detalhes" |
+| faixa de métricas | linha 1 `PanelCpuCard` (barra por núcleo) + `PanelMemoryCard` (RAM + swap); linha 2 `PanelStorageCard` (3 mountpoints) + coluna `PanelNetworkCard`/`PanelTemperatureCard`; linha 3 `PanelAlertRow` × alertas recentes + `PanelServiceRow` × serviços críticos |
+| resumos | 4 `M3MetricCard` clicáveis (Atualizações, Insights, Lua do dia, Próximo compromisso) |
+| rolagem | conteúdo em `ScrollView` com `min-width: 760px`; a janela nunca comprime abaixo disso |
+| callbacks | `page-selected(int)`, `alert-selected(int)`, `service-selected(int)`, `summary-selected(int)`, `health-details-clicked()`, `refresh-requested()`, `close-requested()` |
+| dados | arrays `in-out` com defaults de demonstração (`models.slint`); nenhuma coleta real nesta fase |
+
+**Fases da spec:** 1 (shell estático) entregue. Fases 2–5 (coleta `sysinfo`/`/proc`, regras de alerta, systemd/journald, pacman/RSS) ainda não implementadas — o painel não executa comandos do sistema.
+
+**Desvios documentados**
+
+- **Peso do valor 600** em vez do 400 do `headline-small` M3: hierarquia em dashboards densos exige o valor dominante (mesma decisão do card de referência). Pode voltar a 400 sem quebrar contrato.
+- **M3 não define role de sucesso:** `trend up` usa `tertiary` (roxo), não verde; `down` usa `error`. Se o produto exigir verde semântico, criar role `success`/`on-success` (não existe hoje em `theme.slint`).
+- **Sombra do elevated no Figma:** o MCP `set_effects` não respondeu (`Error: not a function`), então o preview do showcase usa `#2B2930` (surface-container-high) como aproximação. No Slint a sombra real existe (`drop-shadow-blur: 3px`).
+- `enabled`/disabled não é propriedade do componente no MVP; o estado é representado no Figma (conteúdo 38% sobre container 12%) e pode virar token de wrapper quando houver demanda.
+- **Estado saudável sem role de sucesso:** `PanelHealthBanner` usa `m3-tertiary` para "saudável", o mesmo role do `trend up`; a severidade também é comunicada por ícone e texto, não só por cor.
+- **Sem breakpoints reais:** o painel usa `ScrollView` vertical + `min-width` no conteúdo (spec 3.1). Grades que mudam de coluna conforme a largura ficam para uma iteração com `GridLayout`/variantes condicionais.
+- **Dados do painel são estáticos:** os arrays em `AppWindow` servem de contrato para o `ui_bridge` da fase 2; nenhum valor é lido do sistema.
