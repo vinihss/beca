@@ -38,8 +38,13 @@ Precedence: **CLI > ENV > `$XDG_CONFIG_HOME/beca/config.toml` > defaults**.
 ## 4. Current state (post-merge)
 ```text
 crates/
-  beca/                 CLI/daemon: cli, comandos/{launcher,voice,bar,runner}, daemon/{socket,hyprland}
-  beca-core/            XDG config/theme, error, lua/{runtime,bridge} (beca.* API)
+  beca-cli/             bin `beca`: clap CLI + thin command dispatch (no UI/IPC logic)
+  beca-daemon/          typed IPC protocol, client, lifecycle control, request handlers, hyprland bridge
+  beca-process/         /proc scanning, PID liveness, detached spawns, runtime cleanup
+  beca-bar/             bar window fallback, Hyprland geometry, system widgets
+  beca-launcher/        resident launcher server + Lua/UI wiring
+  beca-voice/           voice sessions, transcribe, resident server
+  beca-core/            XDG config/theme, BarProperties, error, lua/{runtime,bridge,runner} (beca.* API)
   beca-apps/            .desktop: desktop_entry, indexer (search/launch)
   beca-ui/              Slint kit (ui/): Theme, SearchWindow, VoiceCaptureWindow + voice engine
   beca-layer-shell/     wlr-layer-shell surfaces (bar, launcher, quick HUD, voice window)

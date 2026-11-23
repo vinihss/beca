@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use beca_core::config::BarModuleConfig;
+use beca_core::BarProperties;
 use beca_core::theme::Theme as BecaTheme;
 use beca_ui::{BarWindow, Theme};
 use slint::platform::software_renderer::{MinimalSoftwareWindow, PremultipliedRgbaColor, RepaintBufferType};
@@ -383,130 +384,35 @@ fn apply_theme(bar: &BarWindow, theme: &BecaTheme) {
 }
 
 fn configure_bar(bar: &BarWindow, cfg: &BarModuleConfig, position: BarPosition) {
-    // Get the resolved layout from the config (widget lists from TOML,
-    // or derived from show-* properties).
-    let (left, center, right) = cfg.resolved_layout();
+    let props = BarProperties::from_config(cfg);
 
-    // Set show-* properties based on the widget lists.
-    // This converts the new widget list format into the individual
-    // show-* properties that the Slint UI uses.
+    macro_rules! widget {
+        ($name:literal, $show:ident, $section:ident) => {
+            if let Some(section) = props.section($name) {
+                bar.$show(true);
+                bar.$section(section.into());
+            } else {
+                bar.$show(false);
+            }
+        };
+    }
 
-    // Left section widgets
-    if left.iter().any(|w| w == "clock") { bar.set_show_clock(true); }
-    if left.iter().any(|w| w == "launcher") { bar.set_show_launcher(true); }
-    if left.iter().any(|w| w == "volume-out") { bar.set_show_volume_out(true); }
-    if left.iter().any(|w| w == "volume-in") { bar.set_show_volume_in(true); }
-    if left.iter().any(|w| w == "conversation") { bar.set_show_conversation(true); }
-    if left.iter().any(|w| w == "alerts") || left.iter().any(|w| w == "info") { bar.set_show_alerts(true); }
-    if left.iter().any(|w| w == "bluetooth") { bar.set_show_bluetooth(true); }
-    if left.iter().any(|w| w == "cpu") { bar.set_show_cpu(true); }
-    if left.iter().any(|w| w == "memory") { bar.set_show_memory(true); }
-    if left.iter().any(|w| w == "disk") { bar.set_show_disk(true); }
+    bar.set_position(match position {
+        BarPosition::Top => "top".into(),
+        BarPosition::Bottom => "bottom".into(),
+    });
 
-    // Center section widgets
-    if center.iter().any(|w| w == "clock") { bar.set_show_clock(true); }
-    if center.iter().any(|w| w == "launcher") { bar.set_show_launcher(true); }
-    if center.iter().any(|w| w == "volume-out") { bar.set_show_volume_out(true); }
-    if center.iter().any(|w| w == "volume-in") { bar.set_show_volume_in(true); }
-    if center.iter().any(|w| w == "conversation") { bar.set_show_conversation(true); }
-    if center.iter().any(|w| w == "alerts") || center.iter().any(|w| w == "info") { bar.set_show_alerts(true); }
-    if center.iter().any(|w| w == "bluetooth") { bar.set_show_bluetooth(true); }
-    if center.iter().any(|w| w == "cpu") { bar.set_show_cpu(true); }
-    if center.iter().any(|w| w == "memory") { bar.set_show_memory(true); }
-    if center.iter().any(|w| w == "disk") { bar.set_show_disk(true); }
-
-    // Right section widgets
-    if right.iter().any(|w| w == "clock") { bar.set_show_clock(true); }
-    if right.iter().any(|w| w == "launcher") { bar.set_show_launcher(true); }
-    if right.iter().any(|w| w == "volume-out") { bar.set_show_volume_out(true); }
-    if right.iter().any(|w| w == "volume-in") { bar.set_show_volume_in(true); }
-    if right.iter().any(|w| w == "conversation") { bar.set_show_conversation(true); }
-    if right.iter().any(|w| w == "alerts") || right.iter().any(|w| w == "info") { bar.set_show_alerts(true); }
-    if right.iter().any(|w| w == "bluetooth") { bar.set_show_bluetooth(true); }
-    if right.iter().any(|w| w == "cpu") { bar.set_show_cpu(true); }
-    if right.iter().any(|w| w == "memory") { bar.set_show_memory(true); }
-    if right.iter().any(|w| w == "disk") { bar.set_show_disk(true); }
-
-    let find_section = |name: &str| -> Option<String> {
-        if left.iter().any(|w| w == name) {
-            Some("left".into())
-        } else if right.iter().any(|w| w == name) {
-            Some("right".into())
-        } else if center.iter().any(|w| w == name) {
-            Some("center".into())
-        } else {
-            None
-        }
-    };
-
-    bar.set_position(match position { BarPosition::Top => "top".into(), BarPosition::Bottom => "bottom".into() });
-
-    if let Some(sec) = find_section("clock") {
-        bar.set_show_clock(true);
-        bar.set_clock_section(sec.into());
-    } else {
-        bar.set_show_clock(false);
-    }
-    if let Some(sec) = find_section("launcher") {
-        bar.set_show_launcher(true);
-        bar.set_launcher_section(sec.into());
-    } else {
-        bar.set_show_launcher(false);
-    }
-    if let Some(sec) = find_section("conversation") {
-        bar.set_show_conversation(true);
-        bar.set_conversation_section(sec.into());
-    } else {
-        bar.set_show_conversation(false);
-    }
-    if let Some(sec) = find_section("volume-out") {
-        bar.set_show_volume_out(true);
-        bar.set_volume_out_section(sec.into());
-    } else {
-        bar.set_show_volume_out(false);
-    }
-    if let Some(sec) = find_section("volume-in") {
-        bar.set_show_volume_in(true);
-        bar.set_volume_in_section(sec.into());
-    } else {
-        bar.set_show_volume_in(false);
-    }
-    if let Some(sec) = find_section("network") {
-        bar.set_show_network(true);
-        bar.set_network_section(sec.into());
-    } else {
-        bar.set_show_network(false);
-    }
-    if let Some(sec) = find_section("alerts") {
-        bar.set_show_alerts(true);
-        bar.set_alerts_section(sec.into());
-    } else {
-        bar.set_show_alerts(false);
-    }
-    if let Some(sec) = find_section("bluetooth") {
-        bar.set_show_bluetooth(true);
-        bar.set_bluetooth_section(sec.into());
-    } else {
-        bar.set_show_bluetooth(false);
-    }
-    if let Some(sec) = find_section("cpu") {
-        bar.set_show_cpu(true);
-        bar.set_cpu_section(sec.into());
-    } else {
-        bar.set_show_cpu(false);
-    }
-    if let Some(sec) = find_section("memory") {
-        bar.set_show_memory(true);
-        bar.set_memory_section(sec.into());
-    } else {
-        bar.set_show_memory(false);
-    }
-    if let Some(sec) = find_section("disk") {
-        bar.set_show_disk(true);
-        bar.set_disk_section(sec.into());
-    } else {
-        bar.set_show_disk(false);
-    }
+    widget!("clock", set_show_clock, set_clock_section);
+    widget!("launcher", set_show_launcher, set_launcher_section);
+    widget!("conversation", set_show_conversation, set_conversation_section);
+    widget!("volume-out", set_show_volume_out, set_volume_out_section);
+    widget!("volume-in", set_show_volume_in, set_volume_in_section);
+    widget!("network", set_show_network, set_network_section);
+    widget!("alerts", set_show_alerts, set_alerts_section);
+    widget!("bluetooth", set_show_bluetooth, set_bluetooth_section);
+    widget!("cpu", set_show_cpu, set_cpu_section);
+    widget!("memory", set_show_memory, set_memory_section);
+    widget!("disk", set_show_disk, set_disk_section);
 
     bar.set_launcher_label(cfg.launcher_label.clone().into());
     bar.set_conversation_active(false);

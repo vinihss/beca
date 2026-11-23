@@ -19,7 +19,7 @@ use std::{
 
 use beca_ui::{AppEntry, SearchWindow};
 
-const EMBEDDED_LAUNCHER: &str = include_str!("../../../../scripts/launcher.lua");
+const EMBEDDED_LAUNCHER: &str = include_str!("../../../scripts/launcher.lua");
 
 fn lua_err(e: mlua::Error) -> anyhow::Error {
     anyhow::anyhow!(e.to_string())

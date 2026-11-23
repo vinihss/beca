@@ -71,6 +71,31 @@ pub fn kill_pids(pids: &[u32]) {
     }
 }
 
+/// Checks whether a PID is alive, ignoring zombie processes.
+pub fn is_pid_alive(pid: u32) -> bool {
+    if pid == 0 {
+        return false;
+    }
+    let Ok(stat) = std::fs::read_to_string(format!("/proc/{pid}/stat")) else {
+        return false;
+    };
+    let Some(end) = stat.rfind(')') else {
+        return false;
+    };
+    if stat[end + 1..]
+        .trim_start()
+        .chars()
+        .next()
+        .is_some_and(|state| matches!(state, 'Z' | 'X' | 'x'))
+    {
+        return false;
+    }
+    Command::new("kill")
+        .args(["-0", &pid.to_string()])
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
 pub fn runtime_dir() -> PathBuf {
     std::env::var_os("XDG_RUNTIME_DIR")
         .map(PathBuf::from)

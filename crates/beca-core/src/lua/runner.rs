@@ -8,7 +8,7 @@ pub fn run_script(script: &str, args: &[String]) -> Result<()> {
             .with_context(|| format!("failed to read script: {}", path.display()))?
     } else {
 
-        let paths = beca_core::config::BecaPaths::resolve();
+        let paths = crate::config::BecaPaths::resolve();
         let name = if script.ends_with(".lua") || script.ends_with(".luau") {
             script.to_string()
         } else {
@@ -25,7 +25,7 @@ pub fn run_script(script: &str, args: &[String]) -> Result<()> {
     };
 
     let lua = mlua::Lua::new();
-    beca_core::lua::bridge::install_beca_base(&lua).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    crate::lua::bridge::install_beca_base(&lua).map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     let arg_tbl = lua
         .create_table()
@@ -59,6 +59,6 @@ pub fn run_script(script: &str, args: &[String]) -> Result<()> {
         .set_name(script)
         .exec()
         .map_err(|e| anyhow::anyhow!("script failed: {e}"))?;
-    beca_core::lua::runtime::call_hook(&lua, "on_load");
+    crate::lua::runtime::call_hook(&lua, "on_load");
     Ok(())
 }

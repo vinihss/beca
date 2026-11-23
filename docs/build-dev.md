@@ -89,7 +89,7 @@ That reduces debug info without losing `opt-level = 1`, but tends to yield a sma
 During code writing, the default path should be:
 
 ```bash
-cargo check -p beca
+cargo check -p beca-cli
 cargo check --workspace
 ```
 
@@ -113,7 +113,7 @@ Recommended cycle:
 
 1. `cargo check -p <crate>` while editing;
 2. `cargo test -p <crate> --lib` when running tests;
-3. `cargo build -p beca` only when you need to open the binary or validate the final link.
+3. `cargo build -p beca-cli` only when you need to open the binary or validate the final link.
 
 ### 2.3 Split `beca-ui` only where there is measured cost
 
@@ -146,7 +146,7 @@ Rule for this work:
 Example measurement when authorized:
 
 ```bash
-cargo build --timings -p beca
+cargo build --timings -p beca-cli
 cargo check --timings --workspace
 ```
 
@@ -194,7 +194,7 @@ cargo test -p beca-ui --lib
 To compare the new profile against real numbers, use Cargo's timings report during an authorized rebuild:
 
 ```bash
-cargo build --timings -p beca
+cargo build --timings -p beca-cli
 ```
 
 Do not use `cargo clean` as a standard step in this validation. If dev artifacts are skewing the comparison, selective cleanup must be decided explicitly by the author of the change.

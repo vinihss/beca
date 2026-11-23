@@ -18,17 +18,22 @@ Config: `$XDG_CONFIG_HOME/beca/config.toml` · Themes: `$XDG_CONFIG_HOME/beca/th
 
 ## Run (workspace)
 ```bash
-cargo run -p beca -- mod launcher:show
-cargo run -p beca -- mod voice:show --hold
-cargo run -p beca -- mod voice:transcribe -i /tmp/file.wav
-cargo run -p beca -- run examples/voice_sdk.luau
-cargo build --release -p beca                     # → target/release/beca
+cargo run -p beca-cli -- mod launcher:show
+cargo run -p beca-cli -- mod voice:show --hold
+cargo run -p beca-cli -- mod voice:transcribe -i /tmp/file.wav
+cargo run -p beca-cli -- run examples/voice_sdk.luau
+cargo build --release -p beca-cli                     # → target/release/beca
 cargo test -p beca-core
 ```
 
 ## Crates
-- `beca` — CLI/daemon (`cli`, `comandos/`, `daemon/`)
-- `beca-core` — XDG config/theme, Lua runtime (`lua/runtime`, `lua/bridge`, `beca.*` API)
+- `beca-cli` — binário `beca`: CLI (clap) e dispatch fino de comandos
+- `beca-daemon` — protocolo IPC tipado, cliente, controladores e handlers
+- `beca-process` — descoberta de processos, liveness e spawn destacado
+- `beca-bar` — barra (fallback de janela), geometria Hyprland e widgets
+- `beca-launcher` — launcher residente com Lua e UI
+- `beca-voice` — sessões de voz, transcrição e servidor residente
+- `beca-core` — XDG config/theme, `BarProperties`, Lua runtime (`lua/runtime`, `lua/bridge`, `lua/runner`, `beca.*` API)
 - `beca-apps` — `.desktop` discovery/launch
 - `beca-ui` — Slint kit (`ui/`: `components/`, `bar/`, `voice/`, `search/`) + voice engine (capture/transcribe/quick)
 - `beca-layer-shell` — wlr-layer-shell surfaces (resident bar, launcher and voice/quick HUDs)

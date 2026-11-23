@@ -1,0 +1,12 @@
+[package]
+name = "beca-voice"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+anyhow = "1"
+slint.workspace = true
+slint-interpreter.workspace = true
+beca-core = { path = "../beca-core" }
+beca-ui = { path = "../beca-ui" }
+beca-layer-shell = { path = "../beca-layer-shell" }

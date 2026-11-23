@@ -538,20 +538,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "beca-bar"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "beca-core",
+ "beca-layer-shell",
+ "beca-ui",
+ "serde_json",
+ "slint-interpreter",
+]
+
+[[package]]
 name = "beca-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "beca-apps",
+ "beca-bar",
  "beca-core",
- "beca-layer-shell",
- "beca-ui",
+ "beca-daemon",
+ "beca-launcher",
+ "beca-process",
+ "beca-voice",
  "clap",
- "mlua",
- "serde",
  "serde_json",
- "slint",
- "slint-interpreter",
 ]
 
 [[package]]
@@ -568,6 +578,33 @@ dependencies = [
  "slint",
  "slint-interpreter",
  "toml 0.8.23",
+]
+
+[[package]]
+name = "beca-daemon"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "beca-apps",
+ "beca-core",
+ "beca-process",
+ "beca-ui",
+ "beca-voice",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "beca-launcher"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "beca-apps",
+ "beca-core",
+ "beca-layer-shell",
+ "beca-ui",
+ "mlua",
+ "slint",
 ]
 
 [[package]]
@@ -591,6 +628,13 @@ dependencies = [
  "beca-ui",
  "slint",
  "slint-build",
+]
+
+[[package]]
+name = "beca-process"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
 ]
 
 [[package]]
@@ -618,6 +662,18 @@ dependencies = [
  "beca-ui",
  "slint",
  "slint-build",
+]
+
+[[package]]
+name = "beca-voice"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "beca-core",
+ "beca-layer-shell",
+ "beca-ui",
+ "slint",
+ "slint-interpreter",
 ]
 
 [[package]]

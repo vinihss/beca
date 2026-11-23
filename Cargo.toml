@@ -1,8 +1,13 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/beca-bar",
     "crates/beca-cli",
     "crates/beca-core",
+    "crates/beca-daemon",
+    "crates/beca-process",
+    "crates/beca-voice",
+    "crates/beca-launcher",
     "crates/beca-apps",
     "crates/beca-ui",
     "crates/beca-ui-catalog",

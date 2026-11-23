@@ -1,8 +1,10 @@
+pub mod bar;
 pub mod config;
 pub mod error;
 pub mod lua;
 pub mod theme;
 
+pub use bar::BarProperties;
 pub use config::{
     BecaPaths, Config, CoreConfig, DEFAULT_CONFIG_TOML, DEFAULT_THEME_TOML, ModulesConfig,
     Resolved, ShellConfig, VoiceMode, VoiceModuleConfig, VoiceUiConfig, apply_env,

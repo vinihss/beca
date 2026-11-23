@@ -10,15 +10,10 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1"
 clap.workspace = true
-mlua.workspace = true
-slint.workspace = true
-slint-interpreter.workspace = true
-serde.workspace = true
 serde_json.workspace = true
 beca-core = { path = "../beca-core" }
-beca-apps = { path = "../beca-apps" }
-beca-ui = { path = "../beca-ui" }
-
-beca-layer-shell = { path = "../beca-layer-shell" }
-
-
+beca-process = { path = "../beca-process" }
+beca-daemon = { path = "../beca-daemon" }
+beca-bar = { path = "../beca-bar" }
+beca-launcher = { path = "../beca-launcher" }
+beca-voice = { path = "../beca-voice" }

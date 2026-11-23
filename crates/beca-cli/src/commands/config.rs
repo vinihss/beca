@@ -1,7 +1,8 @@
 use anyhow::Result;
 
 use crate::cli::ConfigAction;
-use crate::{ipc, output};
+use crate::output;
+use beca_daemon::protocol::Request;
 
 /// Handles `beca config init|reload`.
 pub fn execute(action: ConfigAction) -> Result<()> {
@@ -24,6 +25,6 @@ fn init(force: bool) -> Result<()> {
 }
 
 fn reload() -> Result<()> {
-    let response = ipc::send_request(&serde_json::json!({ "type": "config.reload" }))?;
+    let response = beca_daemon::send(&Request::ConfigReload)?;
     output::print_response(&response, "config reload failed")
 }

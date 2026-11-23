@@ -4,7 +4,7 @@ use std::process::Command;
 use std::thread::sleep;
 use std::time::Duration;
 
-use crate::{output, process};
+use crate::output;
 
 /// Handles `beca restart [--local]`.
 pub fn execute(local: bool) -> Result<()> {
@@ -17,10 +17,10 @@ pub fn execute(local: bool) -> Result<()> {
 
 /// Restarts the Hyprland autostart-managed daemons and bars.
 fn restart_full() -> Result<()> {
-    let daemon_pids = process::find_daemon_pids();
-    let bar_pids = process::find_bar_pids();
-    process::kill_pids(&daemon_pids);
-    process::kill_pids(&bar_pids);
+    let daemon_pids = beca_process::find_daemon_pids();
+    let bar_pids = beca_process::find_bar_pids();
+    beca_process::kill_pids(&daemon_pids);
+    beca_process::kill_pids(&bar_pids);
     if !daemon_pids.is_empty() || !bar_pids.is_empty() {
         sleep(Duration::from_millis(500));
     }
@@ -60,41 +60,41 @@ fn restart_full() -> Result<()> {
 
 /// Restarts every Beca process as a local module supervised by this CLI.
 fn restart_local() -> Result<()> {
-    let runtime = process::runtime_dir();
+    let runtime = beca_process::runtime_dir();
     std::fs::create_dir_all(&runtime).ok();
 
-    let local_mods = process::find_local_module_pids();
-    let daemons = process::find_daemon_pids();
-    process::kill_pids(&local_mods);
-    process::kill_pids(&daemons);
+    let local_mods = beca_process::find_local_module_pids();
+    let daemons = beca_process::find_daemon_pids();
+    beca_process::kill_pids(&local_mods);
+    beca_process::kill_pids(&daemons);
     if !local_mods.is_empty() || !daemons.is_empty() {
         sleep(Duration::from_millis(2000));
     }
-    process::cleanup_runtime_files(&runtime);
+    beca_process::cleanup_runtime_files(&runtime);
 
     let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("beca"));
-    process::spawn_logged(&exe, &["daemon"], &runtime.join("daemon.log"))?;
+    beca_process::spawn_logged(&exe, &["daemon"], &runtime.join("daemon.log"))?;
     sleep(Duration::from_millis(2000));
-    process::spawn_logged(
+    beca_process::spawn_logged(
         &exe,
         &["mod", "--local", "bar:show"],
         &runtime.join("bar.log"),
     )?;
     sleep(Duration::from_millis(1000));
-    process::spawn_logged(
+    beca_process::spawn_logged(
         &exe,
         &["mod", "--local", "launcher:serve"],
         &runtime.join("launcher.log"),
     )?;
     sleep(Duration::from_millis(1000));
-    process::spawn_logged(
+    beca_process::spawn_logged(
         &exe,
         &["mod", "--local", "voice:serve"],
         &runtime.join("voice.log"),
     )?;
     sleep(Duration::from_millis(2000));
 
-    let running = process::find_local_module_pids();
+    let running = beca_process::find_local_module_pids();
     output::print_json(&serde_json::json!({
         "ok": true,
         "restarted": true,

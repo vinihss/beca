@@ -3,26 +3,31 @@
 ## Project
 - **beca**: UI shell for **Hyprland/Wayland** (Rust + [Slint](https://slint.rs/), **Lua** scripts). Single CLI, multi-module, runtime config/themes (XDG), no recompile to tweak theme/params.
 - North star: `beca mod <module>:<action>` · config `$XDG_CONFIG_HOME/beca/config.toml` · themes `themes/*.toml` · scripts `scripts/*.lua`. See `docs/architecture.md` and `docs/schema/`.
-- **Workspace:** `crates/beca` (CLI/daemon), `crates/beca-core` (config/theme + Lua runtime), `crates/beca-apps` (.desktop), `crates/beca-ui` (Slint kit), `crates/beca-layer-shell` (Wayland layer-shell surfaces). `mlua` = **lua54** (vendored).
+- **Workspace:** `crates/beca-cli` (bin `beca`), `crates/beca-daemon` (IPC + handlers), `crates/beca-process`, `crates/beca-bar`, `crates/beca-launcher`, `crates/beca-voice`, `crates/beca-core` (config/theme + Lua runtime), `crates/beca-apps` (.desktop), `crates/beca-ui` (Slint kit), `crates/beca-layer-shell` (Wayland surfaces). `mlua` = **lua54** (vendored).
 
 ## Commands
-- `cargo run -p beca -- --help` / `beca mod --help`
+- `cargo run -p beca-cli -- --help` / `beca mod --help`
 - `beca mod launcher:show` — app launcher (`beca.ui.search_window` + `beca.apps`)
 - `beca mod voice:show [--hold]` / `beca mod voice:transcribe -i <wav>` — native voice (engine `beca-ui` + config `beca-core`)
 - `beca mod ...` routes through the daemon when active (spawn/lifecycle; `--local` forces local). `voice:transcribe` is always local (pipe/stdout).
 - `beca run <script.lua> [args...]` — runs a script with the `beca.*` runtime (path or name in `$XDG_CONFIG_HOME/beca/scripts/`); supports UI via `beca.ui.window/run/quit`
 - `beca daemon` — IPC daemon (`$XDG_RUNTIME_DIR/beca/beca.sock`); `beca ping` / `beca subscribe` (stream Hyprland events)
-- `cargo build --release -p beca` · `cargo check` · `cargo test -p beca-core`
+- `cargo build --release -p beca-cli` · `cargo check` · `cargo test -p beca-core`
 - Lint/format: `cargo fmt` / `cargo clippy`. No CI detected; extensive tests absent.
 
 ## Architecture / wiring
 - **Separation**: Slint/UI in `*/ui/`, Rust in `*/src/`, scripts in `scripts/` or XDG.
-- **`crates/beca`** (bin): `cli.rs`, `comandos.rs`+`comandos/{launcher,voice,bar,runner}.rs`, `daemon.rs`+`daemon/{socket,hyprland}.rs`. `beca mod` routed via daemon, `beca run`.
-- **`crates/beca-core`**: `config.rs` (XDG/paths/load/merge), `theme.rs`, `error.rs`, `lua.rs`+`lua/{runtime,bridge}.rs` (`beca.*` API, XDG scripts + fallback, `on_load`/`on_unload` hooks).
+- **`crates/beca-cli`** (bin `beca`): `cli.rs` (clap), `commands/` (`mod.rs`, `module.rs`, `registry.rs`, thin action wrappers), `output.rs`. No UI or daemon code lives here.
+- **`crates/beca-process`**: /proc scanning, PID liveness, detach/spawn and runtime-file cleanup helpers.
+- **`crates/beca-daemon`**: typed JSON-line protocol (`protocol.rs` `Request`), `client.rs`, `control.rs` (resident launcher/voice + local spawns), `handlers/{bar,launcher,voice,system}.rs`, `hyprland.rs`, `state.rs`.
+- **`crates/beca-bar`**: `show.rs` (window fallback), `hyprland.rs` (geometry), `widgets.rs` (system readers), `converse.rs`.
+- **`crates/beca-launcher`**: resident launcher server, Lua bridge and UI wiring.
+- **`crates/beca-voice`**: voice sessions, quick/converse, transcribe and resident server.
+- **`crates/beca-core`**: `config.rs` (XDG/paths/load/merge), `bar.rs` (`BarProperties`, shared by both bar renderers), `theme.rs`, `error.rs`, `lua.rs`+`lua/{runtime,bridge,runner}.rs` (`beca.*` API, XDG scripts + fallback, `on_load`/`on_unload` hooks).
 - **`crates/beca-apps`**: `desktop_entry.rs` + `indexer.rs` (discovery/launch `.desktop`).
 - **`crates/beca-ui`**: `ui/` (kit: `Theme` in-out, `SearchWindow`, `VoiceCaptureWindow`, `bar/`, `voice/`, `components/`), `src/{lib,ui_loader,theme}.rs` + `src/voice/` (capture/transcribe/quick/streaming/view).
 - **`crates/beca-layer-shell`**: layer-shell surfaces (`bar.rs`, `launcher.rs`, `quick.rs`, `voice.rs`, `platform.rs`) — resident bar/standalone HUD windows.
-- **Daemon**: unix socket JSON lines — `ping/version/hyprland.dispatch`/`hyprland.socket_paths`, `mod` (routing/spawn), `hyprland.subscribe` (stream `.socket2.sock`).
+- **Daemon**: unix socket JSON lines, typed `Request` enum with `#[serde(tag = "type")]` (wire format unchanged) — `ping/version/hyprland.dispatch`/`hyprland.socket_paths`, `mod` (routing/spawn), `bar.status`, `launcher.status`, `config.reload`, `hyprland.subscribe` (stream `.socket2.sock`).
 - **`beca.*` runtime**: `system` (notify/clipboard/exec/env/paths/log), `voice` (transcribe/config), `events` (on/off/emit), `runtime` (config/theme/paths/reload), `ui` (window/run/quit), `hyprland` (dispatch `{ok,response}`/read_events).
 
 ## Direction (target)

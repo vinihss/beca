@@ -1,8 +1,8 @@
 use anyhow::{Result, bail};
 
-use super::{bar, launcher, registry, voice};
+use super::{bar, registry};
 use crate::cli::parse_target;
-use crate::{ipc, output};
+use crate::output;
 
 /// Handles `beca mod <target> [args...]`.
 pub fn execute(target: &str, local: bool, args: &[String]) -> Result<()> {
@@ -24,7 +24,7 @@ pub fn execute(target: &str, local: bool, args: &[String]) -> Result<()> {
 
     let no_daemon = local || std::env::var_os("BECA_NO_DAEMON").is_some();
     if !no_daemon && target != "voice:transcribe" {
-        if let Some(response) = ipc::try_route_mod(target, args) {
+        if let Some(response) = beca_daemon::try_route_mod(target, args) {
             output::ok_or_error(&response, "daemon routing failed")?;
             return output::print_json(&response);
         }
@@ -37,16 +37,16 @@ pub fn execute(target: &str, local: bool, args: &[String]) -> Result<()> {
 fn dispatch(module: &str, action: &str, args: &[String]) -> Result<()> {
     match module {
         "launcher" | "apps" => match action {
-            "show" => launcher::show(),
-            "serve" => launcher::serve(),
-            "hide" => launcher::send_control("hide"),
-            "stop" | "quit" => launcher::send_control("quit"),
+            "show" => beca_launcher::show(),
+            "serve" => beca_launcher::serve(),
+            "hide" => beca_launcher::send_control("hide"),
+            "stop" | "quit" => beca_launcher::send_control("quit"),
             other => {
                 bail!("unknown launcher action: {other} (expected: show, serve, hide, stop)")
             }
         },
         "bar" => bar::dispatch(action, args),
-        "voice" => voice::dispatch(action, args),
+        "voice" => beca_voice::dispatch(action, args),
         other => bail!("unknown module: {other} (available: bar, launcher, voice)"),
     }
 }
