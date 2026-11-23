@@ -199,7 +199,7 @@ pub fn dispatch(action: &str, args: &[String]) -> Result<()> {
         }
         "status" => {
 
-            let resp = crate::daemon::send_request(&serde_json::json!({"type":"bar.status"}));
+            let resp = crate::ipc::send_request(&serde_json::json!({"type":"bar.status"}));
             match resp {
                 Ok(v) => {
                     println!(
@@ -220,7 +220,7 @@ pub fn dispatch(action: &str, args: &[String]) -> Result<()> {
         "hide" | "hide-top" | "hide-bottom" | "stop" | "stop-top" | "stop-bottom" => {
 
             let target = format!("bar:{action}");
-            if let Some(resp) = crate::daemon::try_route_mod(&target, args) {
+            if let Some(resp) = crate::ipc::try_route_mod(&target, args) {
                 println!(
                     "{}",
                     serde_json::to_string(&resp).unwrap_or_else(|_| "{}".into())

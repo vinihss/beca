@@ -1,5 +1,5 @@
 [package]
-name = "beca"
+name = "beca-cli"
 edition.workspace = true
 version.workspace = true
 

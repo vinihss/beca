@@ -1,27 +1,4 @@
-pub mod bar;
-pub mod launcher;
-pub mod runner;
-pub mod voice;
-
-use anyhow::Result;
-
-pub fn dispatch(module: &str, action: &str, args: &[String]) -> Result<()> {
-    match module {
-        "launcher" | "apps" => match action {
-            "show" => launcher::show(),
-            "serve" => launcher::serve(),
-            "hide" => launcher::send_control("hide"),
-            "stop" | "quit" => launcher::send_control("quit"),
-            other => {
-                anyhow::bail!("unknown launcher action: {other} (expected: show, serve, hide, stop)")
-            }
-        },
-        "bar" => bar::dispatch(action, args),
-        "voice" => voice::dispatch(action, args),
-        other => anyhow::bail!("unknown module: {other} (available: bar, launcher, voice)"),
-    }
-}
-
+/// Descriptions used by `beca mod list`.
 pub fn list_modules() -> Vec<(&'static str, &'static str)> {
     vec![
         ("bar", "Status bar (top/bottom) with widgets and layout"),
@@ -30,6 +7,7 @@ pub fn list_modules() -> Vec<(&'static str, &'static str)> {
     ]
 }
 
+/// Help text used by `beca mod <module>:info`.
 pub fn module_info(name: &str) -> Option<String> {
     match name {
         "bar" => Some(
@@ -43,7 +21,8 @@ pub fn module_info(name: &str) -> Option<String> {
                hide-top            Hide top bar\n\
                hide-bottom         Hide bottom bar\n\
                status              Show bar status\n\
-               info                Show this info".to_string(),
+               info                Show this info"
+                .to_string(),
         ),
         "launcher" | "apps" => Some(
             "module: launcher (alias: apps)\n\
@@ -53,7 +32,8 @@ pub fn module_info(name: &str) -> Option<String> {
                serve               Run launcher resident server\n\
                hide                Hide launcher\n\
                stop|quit           Stop launcher\n\
-               info                Show this info".to_string(),
+               info                Show this info"
+                .to_string(),
         ),
         "voice" => Some(
             "module: voice\n\
@@ -66,7 +46,8 @@ pub fn module_info(name: &str) -> Option<String> {
                serve               Run voice resident server\n\
                transcribe -i <wav> Transcribe audio file\n\
                info                Show this info\n\
-             flags: --hold, --respond/--assist/--tts, --no-respond, -i/--input, -o/--output, --run".to_string(),
+             flags: --hold, --respond/--assist/--tts, --no-respond, -i/--input, -o/--output, --run"
+                .to_string(),
         ),
         _ => None,
     }

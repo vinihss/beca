@@ -574,7 +574,7 @@ fn handle_mod_request(req: &Value) -> Value {
         .unwrap_or_default();
 
     if target == "voice:transcribe" {
-        return match crate::comandos::voice::dispatch("transcribe", &args) {
+        return match crate::commands::voice::dispatch("transcribe", &args) {
             Ok(_) => json!({"ok": true, "target": target, "mode": "in-process"}),
             Err(e) => json!({"ok": false, "error": e.to_string(), "target": target}),
         };
