@@ -42,6 +42,49 @@ fn find_beca_daemon_pids() -> Vec<u32> {
     pids
 }
 
+fn find_beca_bar_pids() -> Vec<u32> {
+    let mut pids = Vec::new();
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return pids;
+    };
+    let self_pid = std::process::id();
+    for entry in entries.flatten() {
+        let Ok(pid) = entry
+            .file_name()
+            .to_str()
+            .unwrap_or("")
+            .parse::<u32>()
+        else {
+            continue;
+        };
+        if pid == self_pid {
+            continue;
+        }
+        let cmdline = match std::fs::read(entry.path().join("cmdline")) {
+            Ok(b) => b,
+            Err(_) => continue,
+        };
+        let parts: Vec<String> = cmdline
+            .split(|b| *b == 0)
+            .filter(|s| !s.is_empty())
+            .map(|s| String::from_utf8_lossy(s).to_string())
+            .collect();
+        if parts.len() >= 4 {
+            let exe = parts[0].rsplit('/').next().unwrap_or(&parts[0]);
+            if exe == "beca" && parts[1] == "mod" && parts[2] == "--local" {
+                // Check if it's a bar process (bar:show-top or bar:show-bottom)
+                if parts[3] == "bar:show-top" || parts[3] == "bar:show-bottom" {
+                    pids.push(pid);
+                }
+            }
+        }
+    }
+    pids.sort_unstable();
+    pids.dedup();
+    pids
+}
+
+
 fn find_beca_pids_matching(pred: impl Fn(&[String]) -> bool) -> Vec<u32> {
     let mut pids = Vec::new();
     let Ok(entries) = std::fs::read_dir("/proc") else {
@@ -118,9 +161,11 @@ fn spawn_logged(exe: &PathBuf, args: &[&str], log: &PathBuf) -> Result<()> {
 }
 
 fn restart_full() -> Result<()> {
-    let pids = find_beca_daemon_pids();
-    kill_pids(&pids);
-    if !pids.is_empty() {
+    let daemon_pids = find_beca_daemon_pids();
+    let bar_pids = find_beca_bar_pids();
+    kill_pids(&daemon_pids);
+    kill_pids(&bar_pids);
+    if !daemon_pids.is_empty() || !bar_pids.is_empty() {
         std::thread::sleep(Duration::from_millis(500));
     }
     let script = PathBuf::from(std::env::var_os("HOME").unwrap_or_default())
@@ -131,7 +176,7 @@ fn restart_full() -> Result<()> {
             .status()
             .map_err(|e| anyhow::anyhow!("failed to run autostart: {e}"))?;
         if status.success() {
-            println!("{}", serde_json::json!({"ok": true, "restarted": true, "pids": pids}));
+            println!("{}", serde_json::json!({"ok": true, "restarted": true, "pids": daemon_pids}));
             return Ok(());
         }
         bail!("autostart exited with status {status}");
@@ -144,7 +189,7 @@ fn restart_full() -> Result<()> {
         .stderr(std::process::Stdio::null())
         .spawn()
         .map_err(|e| anyhow::anyhow!("failed to start daemon: {e}"))?;
-    println!("{}", serde_json::json!({"ok": true, "restarted": true, "pids": pids, "mode": "daemon-only"}));
+    println!("{}", serde_json::json!({"ok": true, "restarted": true, "pids": daemon_pids, "mode": "daemon-only"}));
     Ok(())
 }
 

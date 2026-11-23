@@ -383,7 +383,50 @@ fn apply_theme(bar: &BarWindow, theme: &BecaTheme) {
 }
 
 fn configure_bar(bar: &BarWindow, cfg: &BarModuleConfig, position: BarPosition) {
+    // Get the resolved layout from the config (widget lists from TOML,
+    // or derived from show-* properties).
     let (left, center, right) = cfg.resolved_layout();
+
+    // Set show-* properties based on the widget lists.
+    // This converts the new widget list format into the individual
+    // show-* properties that the Slint UI uses.
+
+    // Left section widgets
+    if left.iter().any(|w| w == "clock") { bar.set_show_clock(true); }
+    if left.iter().any(|w| w == "launcher") { bar.set_show_launcher(true); }
+    if left.iter().any(|w| w == "volume-out") { bar.set_show_volume_out(true); }
+    if left.iter().any(|w| w == "volume-in") { bar.set_show_volume_in(true); }
+    if left.iter().any(|w| w == "conversation") { bar.set_show_conversation(true); }
+    if left.iter().any(|w| w == "alerts") || left.iter().any(|w| w == "info") { bar.set_show_alerts(true); }
+    if left.iter().any(|w| w == "bluetooth") { bar.set_show_bluetooth(true); }
+    if left.iter().any(|w| w == "cpu") { bar.set_show_cpu(true); }
+    if left.iter().any(|w| w == "memory") { bar.set_show_memory(true); }
+    if left.iter().any(|w| w == "disk") { bar.set_show_disk(true); }
+
+    // Center section widgets
+    if center.iter().any(|w| w == "clock") { bar.set_show_clock(true); }
+    if center.iter().any(|w| w == "launcher") { bar.set_show_launcher(true); }
+    if center.iter().any(|w| w == "volume-out") { bar.set_show_volume_out(true); }
+    if center.iter().any(|w| w == "volume-in") { bar.set_show_volume_in(true); }
+    if center.iter().any(|w| w == "conversation") { bar.set_show_conversation(true); }
+    if center.iter().any(|w| w == "alerts") || center.iter().any(|w| w == "info") { bar.set_show_alerts(true); }
+    if center.iter().any(|w| w == "bluetooth") { bar.set_show_bluetooth(true); }
+    if center.iter().any(|w| w == "cpu") { bar.set_show_cpu(true); }
+    if center.iter().any(|w| w == "memory") { bar.set_show_memory(true); }
+    if center.iter().any(|w| w == "disk") { bar.set_show_disk(true); }
+
+    // Right section widgets
+    if right.iter().any(|w| w == "clock") { bar.set_show_clock(true); }
+    if right.iter().any(|w| w == "launcher") { bar.set_show_launcher(true); }
+    if right.iter().any(|w| w == "volume-out") { bar.set_show_volume_out(true); }
+    if right.iter().any(|w| w == "volume-in") { bar.set_show_volume_in(true); }
+    if right.iter().any(|w| w == "conversation") { bar.set_show_conversation(true); }
+    if right.iter().any(|w| w == "alerts") || right.iter().any(|w| w == "info") { bar.set_show_alerts(true); }
+    if right.iter().any(|w| w == "bluetooth") { bar.set_show_bluetooth(true); }
+    if right.iter().any(|w| w == "cpu") { bar.set_show_cpu(true); }
+    if right.iter().any(|w| w == "memory") { bar.set_show_memory(true); }
+    if right.iter().any(|w| w == "disk") { bar.set_show_disk(true); }
+
     let find_section = |name: &str| -> Option<String> {
         if left.iter().any(|w| w == name) {
             Some("left".into())
