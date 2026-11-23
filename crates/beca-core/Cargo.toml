@@ -11,7 +11,7 @@ dirs.workspace = true
 mlua.workspace = true
 slint.workspace = true
 slint-interpreter.workspace = true
-anyhow = "1"
+anyhow.workspace = true
 beca-apps = { path = "../beca-apps" }
 beca-ui = { path = "../beca-ui" }
 

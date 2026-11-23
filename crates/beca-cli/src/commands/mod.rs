@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use crate::cli::{Cli, Commands};
 
+pub mod alert;
 pub mod bar;
 pub mod config;
 pub mod daemon;

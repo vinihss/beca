@@ -4,6 +4,7 @@
 
 ## CLI
 ```bash
+beca mod alert:show "texto"             # one-shot AlertWindow layer-shell overlay
 beca mod launcher:show                  # app launcher (SearchWindow + .desktop)
 beca mod voice:show [--hold]            # capture/transcription (UI)
 beca mod voice:quick                    # quick overlay (oscilloscope) for the bar mic button

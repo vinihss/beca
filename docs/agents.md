@@ -9,9 +9,10 @@
 
 ## Commands
 - `cargo run -p beca-cli -- --help` / `beca mod --help`
+- `beca mod alert:show [message] [--title T --message M --timeout-ms N]` — one-shot `AlertWindow` on a click-through layer shell (always local; `BECA_ALERT_TOP_MARGIN`)
 - `beca mod launcher:show` — app launcher (`beca.ui.search_window` + `beca.apps`)
 - `beca mod voice:show [--hold]` / `beca mod voice:transcribe -i <wav>` — native voice (engine `beca-ui` + config `beca-core`)
-- `beca mod ...` routes through the daemon when active (spawn/lifecycle; `--local` forces local). `voice:transcribe` is always local (pipe/stdout).
+- `beca mod ...` routes through the daemon when active (spawn/lifecycle; `--local` forces local). `voice:transcribe` (pipe/stdout) and `alert:*` (one-shot overlay) are always local.
 - `beca run <script.lua> [args...]` — runs a script with the `beca.*` runtime (path or name in `$XDG_CONFIG_HOME/beca/scripts/`); supports UI via `beca.ui.window/run/quit`
 - `beca daemon` — IPC daemon (`$XDG_RUNTIME_DIR/beca/beca.sock`); `beca ping` / `beca subscribe` (stream Hyprland events)
 - `cargo build --release -p beca-cli` · `cargo check` · `cargo test -p beca-core`
@@ -37,7 +38,7 @@
 - Daemon: surface management/lifecycle, layer-shell/Wayland, rich routing.
 - Fully config-driven voice (title/flow/behavior via `beca-core`).
 - **UI design system:** tokens semânticos, primitivas normalizadas e catálogo/storybook nativo separado (`beca-ui-catalog`), com identidade visual a reavaliar — ver `docs/ui-design-system.md`.
-- **Build/performance:** diagnóstico read-only (workspace, Cargo, Slint, timings, hardware, recomendações não aplicadas) em `docs/build-performance-audit.md`.
+- **Build/performance:** diagnóstico read-only e medições das mudanças aplicadas em `docs/build-performance-audit.md`; ciclo de desenvolvimento em `docs/build-dev.md`. `default-members` é apenas `beca-cli` — use `--workspace` para validar os 12 crates.
 
 ## Gotchas
 - **`--hold` vs pipe**: pipe = stdout+exit (binds), no `--hold`. STT daemon `POST /transcribe` → `{ "text" }` (default `127.0.0.1:4100`, `VOICE_DAEMON_URL`).

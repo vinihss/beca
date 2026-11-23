@@ -290,6 +290,7 @@ mod tests {
             "VoiceAssistantWindow",
             "QuickVoiceWindow",
             "ConversationOrb",
+            "AlertWindow",
         ] {
             if let Err(e) = super::compile_component(name) {
                 panic!("{name} failed to compile: {e}");
@@ -320,6 +321,18 @@ mod tests {
                 available.iter().any(|c| c == cb),
                 "ConversationOrb is missing callback `{cb}` (known: {available:?})"
             );
+        }
+    }
+
+    #[test]
+    fn alert_window_declares_rust_api() {
+        let def = super::compile_component("AlertWindow")
+            .unwrap_or_else(|e| panic!("AlertWindow failed to compile: {e}"));
+        let callbacks: Vec<String> = def.callbacks().collect();
+        let properties: Vec<String> = def.properties().map(|(n, _)| n).collect();
+        assert!(callbacks.iter().any(|c| c == "dismiss"), "missing dismiss callback");
+        for prop in ["title-text", "message-text", "timeout", "accent-color"] {
+            assert!(properties.iter().any(|n| n == prop), "missing property `{prop}`");
         }
     }
 

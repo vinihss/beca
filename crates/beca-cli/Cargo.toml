@@ -8,7 +8,7 @@ name = "beca"
 path = "src/main.rs"
 
 [dependencies]
-anyhow = "1"
+anyhow.workspace = true
 clap.workspace = true
 serde_json.workspace = true
 beca-core = { path = "../beca-core" }
@@ -17,3 +17,4 @@ beca-daemon = { path = "../beca-daemon" }
 beca-bar = { path = "../beca-bar" }
 beca-launcher = { path = "../beca-launcher" }
 beca-voice = { path = "../beca-voice" }
+beca-layer-shell = { path = "../beca-layer-shell" }

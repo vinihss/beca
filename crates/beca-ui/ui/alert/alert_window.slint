@@ -1,0 +1,62 @@
+import { Theme } from "../theme.slint";
+
+export component AlertWindow inherits Window {
+    in property <string> title-text: "Beca";
+    in property <string> message-text: "";
+    in property <duration> timeout: 5s;
+    in property <brush> accent-color: Theme.accent;
+
+    callback dismiss();
+
+    width: 420px;
+    height: 112px;
+    background: transparent;
+    no-frame: true;
+    always-on-top: true;
+
+    Timer {
+        interval: root.timeout;
+        triggered => { root.dismiss(); }
+    }
+
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: root.height - 8px;
+        background: Theme.card-bg;
+        border-radius: Theme.radius;
+
+        Rectangle {
+            x: 12px;
+            y: 16px;
+            width: 4px;
+            height: root.height - 40px;
+            background: root.accent-color;
+            border-radius: 2px;
+        }
+
+        VerticalLayout {
+            padding-left: 28px;
+            padding-right: 16px;
+            padding-top: 14px;
+            padding-bottom: 14px;
+            spacing: 4px;
+
+            Text {
+                text: root.title-text;
+                color: Theme.text-strong;
+                font-size: 15px;
+                font-weight: 700;
+            }
+
+            Text {
+                text: root.message-text;
+                color: Theme.text-strong;
+                font-size: 13px;
+                wrap: word-wrap;
+                vertical-stretch: 1;
+            }
+        }
+    }
+}
