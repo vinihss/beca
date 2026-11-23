@@ -1,4 +1,6 @@
-# AGENTS.md
+# Beca Developer Guide
+
+> Entry point for agents: [`AGENTS.md`](../AGENTS.md) (short, always loaded). This file is loaded via `opencode.jsonc` `instructions`. Runtime rules live in [`runtime-rules/`](runtime-rules/README.md).
 
 ## Project
 - **beca**: UI shell for **Hyprland/Wayland** (Rust + [Slint](https://slint.rs/), **Lua** scripts). Single CLI, multi-module, runtime config/themes (XDG), no recompile to tweak theme/params.
@@ -35,6 +37,7 @@
 - Daemon: surface management/lifecycle, layer-shell/Wayland, rich routing.
 - Fully config-driven voice (title/flow/behavior via `beca-core`).
 - **UI design system:** tokens semânticos, primitivas normalizadas e catálogo/storybook nativo separado (`beca-ui-catalog`), com identidade visual a reavaliar — ver `docs/ui-design-system.md`.
+- **Build/performance:** diagnóstico read-only (workspace, Cargo, Slint, timings, hardware, recomendações não aplicadas) em `docs/build-performance-audit.md`.
 
 ## Gotchas
 - **`--hold` vs pipe**: pipe = stdout+exit (binds), no `--hold`. STT daemon `POST /transcribe` → `{ "text" }` (default `127.0.0.1:4100`, `VOICE_DAEMON_URL`).

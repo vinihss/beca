@@ -43,6 +43,7 @@ cargo test -p beca-core
 - `docs/agents.md` — commands/gotchas
 - `docs/hyprland_ipc.md` — Hyprland IPC notes
 - `docs/build-dev.md` — local dev/build optimization analysis
+- `docs/build-performance-audit.md` — read-only diagnosis of workspace, Cargo, Slint, build times and hardware
 - `docs/schema/` — `config.example.toml`, `theme.default.example.toml`
 - `scripts/launcher.lua` — reference launcher
 - `examples/` — example Lua scripts
