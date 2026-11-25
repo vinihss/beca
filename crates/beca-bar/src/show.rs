@@ -236,9 +236,9 @@ pub fn show(position: &str) -> Result<()> {
                             .status();
                         match status {
                             Ok(s) if s.success() => return Ok(()),
-                            Ok(s) => anyhow::bail!(
-                                "bar window fallback process exited with status {s}"
-                            ),
+                            Ok(s) => {
+                                anyhow::bail!("bar window fallback process exited with status {s}")
+                            }
                             Err(err) => {
                                 anyhow::bail!("failed to spawn bar window fallback: {err}")
                             }

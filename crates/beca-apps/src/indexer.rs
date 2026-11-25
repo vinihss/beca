@@ -54,7 +54,11 @@ fn read_history() -> Vec<String> {
     let Ok(content) = fs::read_to_string(path) else {
         return Vec::new();
     };
-    content.lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect()
+    content
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect()
 }
 
 fn write_history(names: &[String]) {
@@ -138,9 +142,7 @@ pub fn launch(name: &str) -> anyhow::Result<Child> {
         .split_first()
         .ok_or_else(|| anyhow::anyhow!("empty Exec field for {}", app.name))?;
 
-    let child = Command::new(program)
-        .args(arguments)
-        .spawn()?;
+    let child = Command::new(program).args(arguments).spawn()?;
     record_launch(&app.name);
     Ok(child)
 }

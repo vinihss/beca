@@ -15,7 +15,7 @@ use std::time::Duration;
 use crate::ui_loader;
 use crate::voice::capture::{self, Behavior, RespondConfig, VoiceTheme, VoiceUiTexts};
 use crate::voice::transcribe;
-use crate::voice::view::{VoiceView, IDLE_WAVEFORM};
+use crate::voice::view::{IDLE_WAVEFORM, VoiceView};
 
 fn quick_ctl_path() -> PathBuf {
     if let Some(dir) = std::env::var_os("XDG_RUNTIME_DIR") {
@@ -114,14 +114,19 @@ pub fn run_quick(
                 return Value::Void;
             }
             if !recording.load(Ordering::Relaxed) {
-                if let Ok(mut all) = recorded.lock() { all.clear(); }
+                if let Ok(mut all) = recorded.lock() {
+                    all.clear();
+                }
                 if let Ok(mut r) = recent.lock() {
-                    for v in r.iter_mut() { *v = 0.0; }
+                    for v in r.iter_mut() {
+                        *v = 0.0;
+                    }
                 }
                 let _ = stream_ctl.play();
                 recording.store(true, Ordering::Relaxed);
                 if let Some(app) = weak.upgrade() {
-                    VoiceView::new(&app).set_status(&recording_state.status_text, &recording_state.status_color);
+                    VoiceView::new(&app)
+                        .set_status(&recording_state.status_text, &recording_state.status_color);
                 }
                 return Value::Void;
             }
@@ -148,11 +153,19 @@ pub fn run_quick(
             cancel_flag.store(false, Ordering::SeqCst);
             let my_gen = generation.load(Ordering::SeqCst);
             if let Some(app) = weak.upgrade() {
-                VoiceView::new(&app).set_status(&transcribing_state.status_text, &transcribing_state.status_color);
+                VoiceView::new(&app).set_status(
+                    &transcribing_state.status_text,
+                    &transcribing_state.status_color,
+                );
             }
             thread::spawn(move || {
-                let is_stale = || generation.load(Ordering::SeqCst) != my_gen || cancel_flag.load(Ordering::Relaxed);
-                if is_stale() { return; }
+                let is_stale = || {
+                    generation.load(Ordering::SeqCst) != my_gen
+                        || cancel_flag.load(Ordering::Relaxed)
+                };
+                if is_stale() {
+                    return;
+                }
                 let result = (|| {
                     if samples.is_empty() {
                         return Err("empty audio capture".to_string());
@@ -171,16 +184,31 @@ pub fn run_quick(
                         let anim_run = Arc::new(AtomicBool::new(true));
                         let anim_flag = anim_run.clone();
                         let recent_anim = recent.clone();
-                        let anim_handle = thread::spawn(move || capture::animate_waveform(&recent_anim, &anim_flag, false));
+                        let anim_handle = thread::spawn(move || {
+                            capture::animate_waveform(&recent_anim, &anim_flag, false)
+                        });
 
                         let resp = if respond_cfg.respond_stream {
-                            capture::generate_response_streaming(&transcript, &respond_cfg, &base_url, &cancel_flag, &weak)
+                            capture::generate_response_streaming(
+                                &transcript,
+                                &respond_cfg,
+                                &base_url,
+                                &cancel_flag,
+                                &weak,
+                            )
                         } else {
-                            capture::generate_response(&transcript, &respond_cfg, &cancel_flag, &active_child)
+                            capture::generate_response(
+                                &transcript,
+                                &respond_cfg,
+                                &cancel_flag,
+                                &active_child,
+                            )
                         };
                         anim_run.store(false, Ordering::Relaxed);
                         let _ = anim_handle.join();
-                        if is_stale() { return; }
+                        if is_stale() {
+                            return;
+                        }
                         match resp {
                             Ok(answer) => {
                                 if let Ok(mut o) = outcome.lock() {
@@ -192,23 +220,38 @@ pub fn run_quick(
                                 if !respond_cfg.respond_stream {
                                     let st = speaking_state.clone();
                                     let _ = weak.upgrade_in_event_loop(move |app| {
-                                        VoiceView::new(&app).set_status(&st.status_text, &st.status_color);
+                                        VoiceView::new(&app)
+                                            .set_status(&st.status_text, &st.status_color);
                                     });
-                                    let _ = capture::speak_response(&answer, &respond_cfg, &cancel_flag, &active_child);
-                                    if is_stale() { return; }
+                                    let _ = capture::speak_response(
+                                        &answer,
+                                        &respond_cfg,
+                                        &cancel_flag,
+                                        &active_child,
+                                    );
+                                    if is_stale() {
+                                        return;
+                                    }
                                 }
                                 let st = success_state.clone();
                                 let _ = weak.upgrade_in_event_loop(move |app| {
-                                    VoiceView::new(&app).set_status(&st.status_text, &st.status_color);
+                                    VoiceView::new(&app)
+                                        .set_status(&st.status_text, &st.status_color);
                                 });
                                 thread::sleep(Duration::from_millis(1400));
-                                if is_stale() { return; }
+                                if is_stale() {
+                                    return;
+                                }
                                 let _ = weak.upgrade_in_event_loop(|app| {
                                     let _ = app.set_property("reveal", Value::Bool(false));
                                 });
                                 thread::sleep(Duration::from_millis(280));
-                                if is_stale() { return; }
-                                let _ = weak.upgrade_in_event_loop(|app| { app.hide().ok(); });
+                                if is_stale() {
+                                    return;
+                                }
+                                let _ = weak.upgrade_in_event_loop(|app| {
+                                    app.hide().ok();
+                                });
                                 ui_loader::quit_event_loop();
                             }
                             Err(e) => {
@@ -220,13 +263,19 @@ pub fn run_quick(
                                     VoiceView::new(&app).set_status("Failed to respond", "#f7768e");
                                 });
                                 thread::sleep(Duration::from_millis(1600));
-                                if is_stale() { return; }
+                                if is_stale() {
+                                    return;
+                                }
                                 let _ = weak.upgrade_in_event_loop(|app| {
                                     let _ = app.set_property("reveal", Value::Bool(false));
                                 });
                                 thread::sleep(Duration::from_millis(280));
-                                if is_stale() { return; }
-                                let _ = weak.upgrade_in_event_loop(|app| { app.hide().ok(); });
+                                if is_stale() {
+                                    return;
+                                }
+                                let _ = weak.upgrade_in_event_loop(|app| {
+                                    app.hide().ok();
+                                });
                                 ui_loader::quit_event_loop();
                             }
                         }
@@ -242,13 +291,19 @@ pub fn run_quick(
                             VoiceView::new(&app).set_status(&st.status_text, &st.status_color);
                         });
                         thread::sleep(Duration::from_millis(1200));
-                        if is_stale() { return; }
+                        if is_stale() {
+                            return;
+                        }
                         let _ = weak.upgrade_in_event_loop(|app| {
                             let _ = app.set_property("reveal", Value::Bool(false));
                         });
                         thread::sleep(Duration::from_millis(280));
-                        if is_stale() { return; }
-                        let _ = weak.upgrade_in_event_loop(|app| { app.hide().ok(); });
+                        if is_stale() {
+                            return;
+                        }
+                        let _ = weak.upgrade_in_event_loop(|app| {
+                            app.hide().ok();
+                        });
                         ui_loader::quit_event_loop();
                     }
                     Err(e) => {
@@ -258,16 +313,23 @@ pub fn run_quick(
                         }
                         let weak2 = weak.clone();
                         let _ = weak2.upgrade_in_event_loop(move |app| {
-                            VoiceView::new(&app).set_status("Error: transcription failed", "#f7768e");
+                            VoiceView::new(&app)
+                                .set_status("Error: transcription failed", "#f7768e");
                         });
                         thread::sleep(Duration::from_millis(1600));
-                        if is_stale() { return; }
+                        if is_stale() {
+                            return;
+                        }
                         let _ = weak.upgrade_in_event_loop(|app| {
                             let _ = app.set_property("reveal", Value::Bool(false));
                         });
                         thread::sleep(Duration::from_millis(280));
-                        if is_stale() { return; }
-                        let _ = weak.upgrade_in_event_loop(|app| { app.hide().ok(); });
+                        if is_stale() {
+                            return;
+                        }
+                        let _ = weak.upgrade_in_event_loop(|app| {
+                            app.hide().ok();
+                        });
                         ui_loader::quit_event_loop();
                     }
                 }
@@ -305,7 +367,9 @@ pub fn run_quick(
             let weak_exit = weak.clone();
             thread::spawn(move || {
                 thread::sleep(Duration::from_millis(280));
-                let _ = weak_exit.upgrade_in_event_loop(|app| { let _ = app.hide().ok(); });
+                let _ = weak_exit.upgrade_in_event_loop(|app| {
+                    let _ = app.hide().ok();
+                });
                 thread::sleep(Duration::from_millis(60));
                 ui_loader::quit_event_loop();
             });

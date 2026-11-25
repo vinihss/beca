@@ -5,7 +5,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixListener;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::mpsc::{sync_channel, Receiver};
+use std::sync::mpsc::{Receiver, sync_channel};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -57,7 +57,10 @@ fn set_level(weak: &slint_interpreter::Weak<slint_interpreter::ComponentInstance
     });
 }
 
-fn set_transcript(weak: &slint_interpreter::Weak<slint_interpreter::ComponentInstance>, text: &str) {
+fn set_transcript(
+    weak: &slint_interpreter::Weak<slint_interpreter::ComponentInstance>,
+    text: &str,
+) {
     let weak = weak.clone();
     let text = text.to_string();
     let _ = weak.upgrade_in_event_loop(move |app| {
@@ -65,7 +68,11 @@ fn set_transcript(weak: &slint_interpreter::Weak<slint_interpreter::ComponentIns
     });
 }
 
-fn set_status(weak: &slint_interpreter::Weak<slint_interpreter::ComponentInstance>, text: &str, color: &str) {
+fn set_status(
+    weak: &slint_interpreter::Weak<slint_interpreter::ComponentInstance>,
+    text: &str,
+    color: &str,
+) {
     let weak = weak.clone();
     let text = text.to_string();
     let color = color.to_string();
@@ -116,36 +123,30 @@ fn build_frame_stream(
     }
     let channels = config.channels as usize;
     match sample_format {
-        cpal::SampleFormat::F32 => {
-            device.build_input_stream(
-                config,
-                move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                    let _ = tx.try_send(mono_f32(data, channels));
-                },
-                |err| eprintln!("[beca-converse] input stream error: {err}"),
-                None,
-            )
-        }
-        cpal::SampleFormat::I16 => {
-            device.build_input_stream(
-                config,
-                move |data: &[i16], _: &cpal::InputCallbackInfo| {
-                    let _ = tx.try_send(mono_i16(data, channels));
-                },
-                |err| eprintln!("[beca-converse] input stream error: {err}"),
-                None,
-            )
-        }
-        cpal::SampleFormat::U16 => {
-            device.build_input_stream(
-                config,
-                move |data: &[u16], _: &cpal::InputCallbackInfo| {
-                    let _ = tx.try_send(mono_u16(data, channels));
-                },
-                |err| eprintln!("[beca-converse] input stream error: {err}"),
-                None,
-            )
-        }
+        cpal::SampleFormat::F32 => device.build_input_stream(
+            config,
+            move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                let _ = tx.try_send(mono_f32(data, channels));
+            },
+            |err| eprintln!("[beca-converse] input stream error: {err}"),
+            None,
+        ),
+        cpal::SampleFormat::I16 => device.build_input_stream(
+            config,
+            move |data: &[i16], _: &cpal::InputCallbackInfo| {
+                let _ = tx.try_send(mono_i16(data, channels));
+            },
+            |err| eprintln!("[beca-converse] input stream error: {err}"),
+            None,
+        ),
+        cpal::SampleFormat::U16 => device.build_input_stream(
+            config,
+            move |data: &[u16], _: &cpal::InputCallbackInfo| {
+                let _ = tx.try_send(mono_u16(data, channels));
+            },
+            |err| eprintln!("[beca-converse] input stream error: {err}"),
+            None,
+        ),
         other => return Err(format!("unsupported sample format: {other:?}")),
     }
     .map_err(|e| e.to_string())
@@ -228,7 +229,9 @@ impl VadEngine {
                 } else {
                     self.silence_run += 1;
                 }
-                if self.silence_run >= OFFSET_FRAMES || self.utterance.len() >= self.max_utterance_samples {
+                if self.silence_run >= OFFSET_FRAMES
+                    || self.utterance.len() >= self.max_utterance_samples
+                {
                     endpoint = Some(std::mem::take(&mut self.utterance));
                     self.voiced_run = 0;
                     self.silence_run = 0;
@@ -267,7 +270,11 @@ fn process_utterance(
             return;
         }
     };
-    eprintln!("[beca-converse][timing] stt {:?} chars={}", t.elapsed(), text.chars().count());
+    eprintln!(
+        "[beca-converse][timing] stt {:?} chars={}",
+        t.elapsed(),
+        text.chars().count()
+    );
     let text = text.trim().to_string();
     if text.is_empty() {
         set_status(weak, "Listening...", "#7aa2f7");
@@ -317,7 +324,9 @@ pub fn run_conversation(
     let sample_rate = config.sample_rate.0;
     eprintln!("[beca-converse] audio: {channels}ch {sample_rate}Hz ({sample_format:?})");
     if sample_rate != 16_000 {
-        eprintln!("[beca-converse] warning: device could not open 16 kHz; VAD timing tuned for 16 kHz degrades at {sample_rate}Hz");
+        eprintln!(
+            "[beca-converse] warning: device could not open 16 kHz; VAD timing tuned for 16 kHz degrades at {sample_rate}Hz"
+        );
     }
 
     let (tx, rx) = sync_channel::<Vec<f32>>(64);
@@ -338,7 +347,9 @@ pub fn run_conversation(
         let weak_exit = weak_quit.clone();
         thread::spawn(move || {
             thread::sleep(Duration::from_millis(260));
-            let _ = weak_exit.upgrade_in_event_loop(|app| { let _ = app.hide().ok(); });
+            let _ = weak_exit.upgrade_in_event_loop(|app| {
+                let _ = app.hide().ok();
+            });
             thread::sleep(Duration::from_millis(60));
             ui_loader::quit_event_loop();
         });
@@ -363,7 +374,9 @@ pub fn run_conversation(
                     Err(_) => break,
                 };
                 if last_level_ui.elapsed() >= Duration::from_millis(70) {
-                    let rms = (chunk.iter().map(|s| s * s).sum::<f32>() / chunk.len().max(1) as f32).sqrt();
+                    let rms = (chunk.iter().map(|s| s * s).sum::<f32>()
+                        / chunk.len().max(1) as f32)
+                        .sqrt();
                     set_level(&weak, (rms / 0.085).min(1.0));
                     last_level_ui = Instant::now();
                 }
@@ -377,7 +390,14 @@ pub fn run_conversation(
                             continue;
                         }
                         set_status(&weak, "Transcribing...", "#7aa2f7");
-                        process_utterance(&samples, sample_rate, &base_url, &respond_cfg, &stop, &weak);
+                        process_utterance(
+                            &samples,
+                            sample_rate,
+                            &base_url,
+                            &respond_cfg,
+                            &stop,
+                            &weak,
+                        );
                         drain_channel(&rx);
                         vad.reset_to_listening();
                         if !stop.load(Ordering::Relaxed) {
@@ -457,7 +477,10 @@ pub fn run_conversation(
         });
     });
 
-    eprintln!("[beca-converse][timing] session ready in {:?}", t0.elapsed());
+    eprintln!(
+        "[beca-converse][timing] session ready in {:?}",
+        t0.elapsed()
+    );
 
     ui_loader::run_event_loop()?;
 

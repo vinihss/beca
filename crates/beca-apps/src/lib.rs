@@ -1,5 +1,5 @@
 pub mod desktop_entry;
 pub mod indexer;
 
-pub use desktop_entry::{clear_icon_cache, Application};
+pub use desktop_entry::{Application, clear_icon_cache};
 pub use indexer::{launch, reload_index, search};

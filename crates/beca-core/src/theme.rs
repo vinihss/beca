@@ -12,7 +12,6 @@ pub struct Theme {
     pub metrics: ThemeMetrics,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ThemeMeta {
@@ -78,7 +77,6 @@ impl Default for ThemeMetrics {
 }
 
 impl Theme {
-
     pub fn voice_theme(&self) -> beca_ui::voice::VoiceTheme {
         beca_ui::voice::VoiceTheme {
             background: self.colors.background.clone(),

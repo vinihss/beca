@@ -9,18 +9,18 @@ use smithay_client_toolkit::{
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     shell::{
+        WaylandSurface,
         wlr_layer::{
             Anchor, KeyboardInteractivity, Layer, LayerShell, LayerShellHandler, LayerSurface,
             LayerSurfaceConfigure,
         },
-        WaylandSurface,
     },
-    shm::{slot::SlotPool, Shm, ShmHandler},
+    shm::{Shm, ShmHandler, slot::SlotPool},
 };
 use wayland_client::{
     Connection, QueueHandle,
     globals::registry_queue_init,
-    protocol::{wl_output, wl_surface, wl_shm},
+    protocol::{wl_output, wl_shm, wl_surface},
 };
 
 const WIDTH: u32 = 480;
@@ -61,8 +61,8 @@ impl QuickState {
             return Ok(());
         }
 
-        let input_region = Region::new(&self.compositor)
-            .map_err(|e| format!("input region: {e}"))?;
+        let input_region =
+            Region::new(&self.compositor).map_err(|e| format!("input region: {e}"))?;
 
         let surface = self.compositor.create_surface(&self.qh);
         let layer = self.layer_shell.create_layer_surface(
@@ -114,8 +114,12 @@ impl QuickState {
     }
 
     fn draw_if_needed(&mut self) {
-        let Some(inst) = self.instance.as_mut() else { return };
-        if !inst.configured { return; }
+        let Some(inst) = self.instance.as_mut() else {
+            return;
+        };
+        if !inst.configured {
+            return;
+        }
 
         let width = inst.width.max(1);
         let height = inst.height.max(1);
@@ -131,7 +135,12 @@ impl QuickState {
                 Err(_) => return,
             };
             let mut rgba = vec![
-                PremultipliedRgbaColor { red: 0, green: 0, blue: 0, alpha: 0 };
+                PremultipliedRgbaColor {
+                    red: 0,
+                    green: 0,
+                    blue: 0,
+                    alpha: 0
+                };
                 (width * height) as usize
             ];
             renderer.render(rgba.as_mut_slice(), width as usize);
@@ -144,7 +153,9 @@ impl QuickState {
             inst.layer
                 .wl_surface()
                 .damage_buffer(0, 0, width as i32, height as i32);
-            inst.layer.wl_surface().frame(&self.qh, inst.layer.wl_surface().clone());
+            inst.layer
+                .wl_surface()
+                .frame(&self.qh, inst.layer.wl_surface().clone());
             let _ = buffer.attach_to(inst.layer.wl_surface());
             inst.layer.commit();
         });
@@ -161,8 +172,8 @@ pub fn run_quick_layer_shell(window: Rc<MinimalSoftwareWindow>) -> Result<(), St
 
     let compositor =
         CompositorState::bind(&globals, &qh).map_err(|e| format!("wl_compositor: {e}"))?;
-    let layer_shell = LayerShell::bind(&globals, &qh)
-        .map_err(|e| format!("wlr-layer-shell unavailable: {e}"))?;
+    let layer_shell =
+        LayerShell::bind(&globals, &qh).map_err(|e| format!("wlr-layer-shell unavailable: {e}"))?;
     let shm = Shm::bind(&globals, &qh).map_err(|e| format!("wl_shm: {e}"))?;
 
     let mut state = QuickState {
@@ -178,7 +189,6 @@ pub fn run_quick_layer_shell(window: Rc<MinimalSoftwareWindow>) -> Result<(), St
     };
 
     loop {
-
         crate::platform::drain_pending_closures();
         slint::platform::update_timers_and_animations();
         if crate::platform::quit_requested() || state.exit {
@@ -203,13 +213,36 @@ pub fn run_quick_layer_shell(window: Rc<MinimalSoftwareWindow>) -> Result<(), St
 }
 
 impl CompositorHandler for QuickState {
-    fn scale_factor_changed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: i32) {}
-    fn transform_changed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: wl_output::Transform) {}
-    fn frame(&mut self, _: &Connection, _qh: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: u32) {}
+    fn scale_factor_changed(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &wl_surface::WlSurface,
+        _: i32,
+    ) {
+    }
+    fn transform_changed(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &wl_surface::WlSurface,
+        _: wl_output::Transform,
+    ) {
+    }
+    fn frame(
+        &mut self,
+        _: &Connection,
+        _qh: &QueueHandle<Self>,
+        _: &wl_surface::WlSurface,
+        _: u32,
+    ) {
+    }
 }
 
 impl OutputHandler for QuickState {
-    fn output_state(&mut self) -> &mut OutputState { &mut self.output_state }
+    fn output_state(&mut self) -> &mut OutputState {
+        &mut self.output_state
+    }
     fn new_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
     fn update_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
     fn output_destroyed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
@@ -235,9 +268,12 @@ impl LayerShellHandler for QuickState {
             inst.height = if h > 0 { h } else { HEIGHT };
             inst.configured = true;
             Some((inst.width, inst.height))
-        } else { None };
+        } else {
+            None
+        };
         if let Some((width, height)) = dims {
-            self.window.set_size(slint::PhysicalSize::new(width, height));
+            self.window
+                .set_size(slint::PhysicalSize::new(width, height));
             let needed = (width as usize) * (height as usize) * 4;
             if let Ok(new_pool) = SlotPool::new(needed.max(4096), &self.shm)
                 && let Some(inst) = self.instance_for_layer_mut(layer)
@@ -250,7 +286,9 @@ impl LayerShellHandler for QuickState {
 }
 
 impl ShmHandler for QuickState {
-    fn shm_state(&mut self) -> &mut Shm { &mut self.shm }
+    fn shm_state(&mut self) -> &mut Shm {
+        &mut self.shm
+    }
 }
 
 delegate_compositor!(QuickState);
@@ -260,6 +298,8 @@ delegate_layer!(QuickState);
 delegate_registry!(QuickState);
 
 impl ProvidesRegistryState for QuickState {
-    fn registry(&mut self) -> &mut RegistryState { &mut self.registry_state }
+    fn registry(&mut self) -> &mut RegistryState {
+        &mut self.registry_state
+    }
     registry_handlers![OutputState];
 }

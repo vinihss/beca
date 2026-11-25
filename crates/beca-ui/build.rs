@@ -14,7 +14,11 @@ fn collect_slint_files(dir: &Path, base: &Path, out: &mut Vec<PathBuf>) {
         if path.is_dir() {
             collect_slint_files(&path, base, out);
         } else if path.extension() == Some(OsStr::new("slint")) {
-            out.push(path.strip_prefix(base).expect("strip ui prefix").to_path_buf());
+            out.push(
+                path.strip_prefix(base)
+                    .expect("strip ui prefix")
+                    .to_path_buf(),
+            );
         }
     }
 }

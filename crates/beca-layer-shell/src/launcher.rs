@@ -1,6 +1,6 @@
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use slint::platform::software_renderer::{MinimalSoftwareWindow, PremultipliedRgbaColor};
@@ -8,29 +8,29 @@ use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{LogicalPosition, PhysicalSize, SharedString};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
-    delegate_compositor, delegate_layer, delegate_output, delegate_pointer,
-    delegate_registry, delegate_seat, delegate_shm,
+    delegate_compositor, delegate_layer, delegate_output, delegate_pointer, delegate_registry,
+    delegate_seat, delegate_shm,
     output::{OutputHandler, OutputState},
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     seat::{
+        Capability, SeatHandler, SeatState,
         keyboard::{KeyEvent, KeyboardHandler, Modifiers, RepeatInfo},
         pointer::{PointerEvent, PointerEventKind, PointerHandler},
-        Capability, SeatHandler, SeatState,
     },
     shell::{
+        WaylandSurface,
         wlr_layer::{
             Anchor, KeyboardInteractivity, Layer, LayerShell, LayerShellHandler, LayerSurface,
             LayerSurfaceConfigure,
         },
-        WaylandSurface,
     },
-    shm::{slot::SlotPool, Shm, ShmHandler},
+    shm::{Shm, ShmHandler, slot::SlotPool},
 };
 use wayland_client::{
+    Connection, QueueHandle,
     globals::registry_queue_init,
     protocol::{wl_keyboard, wl_output, wl_pointer, wl_seat, wl_shm, wl_surface},
-    Connection, QueueHandle,
 };
 use xkeysym::Keysym;
 
@@ -99,7 +99,6 @@ impl LauncherState {
     }
 
     fn hide_surface(&mut self) {
-
         self.instance = None;
         self.keyboard_focused = false;
     }
@@ -115,9 +114,7 @@ impl LauncherState {
     }
 
     fn instance_for_layer_mut(&mut self, layer: &LayerSurface) -> Option<&mut LauncherInstance> {
-        self.instance
-            .as_mut()
-            .filter(|i| &i.layer == layer)
+        self.instance.as_mut().filter(|i| &i.layer == layer)
     }
 
     fn instance_for_surface(&self, surface: &wl_surface::WlSurface) -> bool {
@@ -128,7 +125,9 @@ impl LauncherState {
     }
 
     fn draw_if_needed(&mut self) {
-        let Some(inst) = self.instance.as_mut() else { return };
+        let Some(inst) = self.instance.as_mut() else {
+            return;
+        };
         if !inst.configured {
             return;
         }
@@ -165,7 +164,9 @@ impl LauncherState {
             inst.layer
                 .wl_surface()
                 .damage_buffer(0, 0, width as i32, height as i32);
-            inst.layer.wl_surface().frame(&self.qh, inst.layer.wl_surface().clone());
+            inst.layer
+                .wl_surface()
+                .frame(&self.qh, inst.layer.wl_surface().clone());
             let _ = buffer.attach_to(inst.layer.wl_surface());
             inst.layer.commit();
             did = true;
@@ -193,8 +194,8 @@ pub fn run_launcher_with_nav(
 
     let compositor =
         CompositorState::bind(&globals, &qh).map_err(|e| format!("wl_compositor: {e}"))?;
-    let layer_shell = LayerShell::bind(&globals, &qh)
-        .map_err(|e| format!("wlr-layer-shell unavailable: {e}"))?;
+    let layer_shell =
+        LayerShell::bind(&globals, &qh).map_err(|e| format!("wlr-layer-shell unavailable: {e}"))?;
     let shm = Shm::bind(&globals, &qh).map_err(|e| format!("wl_shm: {e}"))?;
 
     let mut state = LauncherState {
@@ -278,7 +279,6 @@ impl LayerShellHandler for LauncherState {
     fn closed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &LayerSurface) {
         let _ = self.window.hide();
         self.hide_surface();
-
     }
 
     fn configure(
@@ -324,12 +324,14 @@ impl SeatHandler for LauncherState {
         seat: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Pointer && self.pointer.is_none()
+        if capability == Capability::Pointer
+            && self.pointer.is_none()
             && let Ok(pointer) = self.seat_state.get_pointer(qh, &seat)
         {
             self.pointer = Some(pointer);
         }
-        if capability == Capability::Keyboard && self.keyboard.is_none()
+        if capability == Capability::Keyboard
+            && self.keyboard.is_none()
             && let Ok(kb) = self.seat_state.get_keyboard(qh, &seat, None)
         {
             self.keyboard = Some(kb);
@@ -342,10 +344,14 @@ impl SeatHandler for LauncherState {
         _: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Pointer && let Some(pointer) = self.pointer.take() {
+        if capability == Capability::Pointer
+            && let Some(pointer) = self.pointer.take()
+        {
             pointer.release();
         }
-        if capability == Capability::Keyboard && let Some(kb) = self.keyboard.take() {
+        if capability == Capability::Keyboard
+            && let Some(kb) = self.keyboard.take()
+        {
             kb.release();
         }
     }
@@ -395,7 +401,6 @@ impl PointerHandler for LauncherState {
                     vertical,
                     ..
                 } => {
-
                     let dx = -horizontal.absolute as f32;
                     let dy = -vertical.absolute as f32;
                     if dx != 0.0 || dy != 0.0 {
@@ -508,7 +513,8 @@ impl KeyboardHandler for LauncherState {
                 self.window.request_redraw();
                 return;
             }
-            self.window.dispatch_event(WindowEvent::KeyReleased { text });
+            self.window
+                .dispatch_event(WindowEvent::KeyReleased { text });
         }
         self.window.request_redraw();
     }
@@ -565,7 +571,6 @@ fn map_button(button: u32) -> Option<PointerEventButton> {
 }
 
 fn keysym_to_slint_text(event: &KeyEvent) -> Option<SharedString> {
-
     let special: Option<SharedString> = match event.keysym {
         Keysym::Escape => Some(Key::Escape.into()),
         Keysym::Return | Keysym::KP_Enter => Some(Key::Return.into()),
@@ -586,8 +591,13 @@ fn keysym_to_slint_text(event: &KeyEvent) -> Option<SharedString> {
         return special;
     }
 
-    if let Some(ref utf8) = event.utf8 && !utf8.is_empty() {
+    if let Some(ref utf8) = event.utf8
+        && !utf8.is_empty()
+    {
         return Some(SharedString::from(utf8.as_str()));
     }
-    event.keysym.key_char().map(|c| SharedString::from(c.to_string().as_str()))
+    event
+        .keysym
+        .key_char()
+        .map(|c| SharedString::from(c.to_string().as_str()))
 }

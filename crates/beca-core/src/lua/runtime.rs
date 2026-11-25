@@ -39,7 +39,6 @@ pub fn call_hook(lua: &Lua, name: &str) {
 }
 
 pub fn exec_module_script(lua: &Lua, name: &str, embedded: &str) -> Result<()> {
-
     if let Ok(beca) = lua.globals().get::<Table>("beca")
         && let Ok(runtime) = beca.get::<Table>("runtime")
     {

@@ -50,7 +50,6 @@ fn install_system(lua: &Lua, beca: &Table) -> mlua::Result<()> {
     system.set(
         "clipboard_copy",
         lua.create_function(|_, text: String| {
-
             for (cmd, args) in [
                 ("wl-copy", vec![]),
                 ("xclip", vec!["-selection", "clipboard"]),

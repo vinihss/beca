@@ -10,8 +10,9 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
     sync::{
+        Arc,
         atomic::{AtomicBool, Ordering},
-        mpsc, Arc,
+        mpsc,
     },
     thread,
     time::Duration,
@@ -51,7 +52,6 @@ pub fn send_control(cmd: &str) -> Result<()> {
 }
 
 pub fn show() -> Result<()> {
-
     if send_control("show").is_ok() {
         return Ok(());
     }
@@ -64,8 +64,8 @@ pub fn serve() -> Result<()> {
 }
 
 fn run_launcher(resident: bool) -> Result<()> {
-
-    let queue: Rc<RefCell<VecDeque<Rc<MinimalSoftwareWindow>>>> = Rc::new(RefCell::new(VecDeque::new()));
+    let queue: Rc<RefCell<VecDeque<Rc<MinimalSoftwareWindow>>>> =
+        Rc::new(RefCell::new(VecDeque::new()));
     beca_layer_shell::install_platform(queue.clone());
     let msw = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
     queue.borrow_mut().push_back(msw.clone());
@@ -129,7 +129,6 @@ fn run_launcher(resident: bool) -> Result<()> {
             search.set(
                 "set_results",
                 lua.create_function(move |_, args: mlua::MultiValue| {
-
                     let items_val = if args.len() >= 2 {
                         args.into_iter().nth(1).unwrap_or(mlua::Value::Nil)
                     } else {
@@ -147,10 +146,9 @@ fn run_launcher(resident: bool) -> Result<()> {
                                         if let Some(cached) = image_cache.borrow().get(&icon_path) {
                                             cached.clone()
                                         } else if Path::new(&icon_path).exists() {
-                                            let img = slint::Image::load_from_path(Path::new(
-                                                &icon_path,
-                                            ))
-                                            .unwrap_or_default();
+                                            let img =
+                                                slint::Image::load_from_path(Path::new(&icon_path))
+                                                    .unwrap_or_default();
                                             image_cache
                                                 .borrow_mut()
                                                 .insert(icon_path.clone(), img.clone());
@@ -266,7 +264,6 @@ fn run_launcher(resident: bool) -> Result<()> {
     let (nav_tx, nav_rx) = mpsc::channel::<i32>();
 
     if resident {
-
         window
             .window()
             .on_close_requested(|| slint::CloseRequestResponse::HideWindow);
@@ -274,7 +271,6 @@ fn run_launcher(resident: bool) -> Result<()> {
 
         let _ = window.hide();
     } else {
-
         let weak_quit = window.as_weak();
         let quit_close = quit.clone();
         window.window().on_close_requested(move || {
@@ -288,7 +284,8 @@ fn run_launcher(resident: bool) -> Result<()> {
         let _ = window.show();
     }
 
-    beca_layer_shell::run_launcher_with_nav(msw, quit, Some(nav_tx)).map_err(|e| anyhow::anyhow!(e))?;
+    beca_layer_shell::run_launcher_with_nav(msw, quit, Some(nav_tx))
+        .map_err(|e| anyhow::anyhow!(e))?;
     Ok(())
 }
 

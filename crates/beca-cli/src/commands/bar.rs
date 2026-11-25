@@ -18,26 +18,28 @@ pub fn dispatch(action: &str, args: &[String]) -> Result<()> {
                 })
                 .or_else(|| args.first().map(String::as_str))
                 .unwrap_or("top");
-            beca_bar::show(if position == "bottom" { "bottom" } else { "top" })
+            beca_bar::show(if position == "bottom" {
+                "bottom"
+            } else {
+                "top"
+            })
         }
-        "status" => {
-            match beca_daemon::send(&beca_daemon::protocol::Request::BarStatus) {
-                Ok(response) => {
-                    println!(
-                        "{}",
-                        serde_json::to_string(&response).unwrap_or_else(|_| "{}".into())
-                    );
-                    Ok(())
-                }
-                Err(error) => {
-                    println!(
-                        "{}",
-                        serde_json::json!({"ok": false, "error": error.to_string()})
-                    );
-                    Ok(())
-                }
+        "status" => match beca_daemon::send(&beca_daemon::protocol::Request::BarStatus) {
+            Ok(response) => {
+                println!(
+                    "{}",
+                    serde_json::to_string(&response).unwrap_or_else(|_| "{}".into())
+                );
+                Ok(())
             }
-        }
+            Err(error) => {
+                println!(
+                    "{}",
+                    serde_json::json!({"ok": false, "error": error.to_string()})
+                );
+                Ok(())
+            }
+        },
         "hide" | "hide-top" | "hide-bottom" | "stop" | "stop-top" | "stop-bottom" => {
             let target = format!("bar:{action}");
             if let Some(response) = beca_daemon::try_route_mod(&target, args) {

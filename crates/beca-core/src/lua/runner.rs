@@ -7,7 +7,6 @@ pub fn run_script(script: &str, args: &[String]) -> Result<()> {
         std::fs::read_to_string(path)
             .with_context(|| format!("failed to read script: {}", path.display()))?
     } else {
-
         let paths = crate::config::BecaPaths::resolve();
         let name = if script.ends_with(".lua") || script.ends_with(".luau") {
             script.to_string()

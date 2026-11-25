@@ -7,9 +7,8 @@ pub mod theme;
 pub use bar::BarProperties;
 pub use config::{
     BecaPaths, Config, CoreConfig, DEFAULT_CONFIG_TOML, DEFAULT_THEME_TOML, ModulesConfig,
-    Resolved, ShellConfig, VoiceMode, VoiceModuleConfig, VoiceUiConfig, apply_env,
-    ensure_defaults, ensure_defaults_with_paths, load, load_config, load_config_from,
-    load_with_paths,
+    Resolved, ShellConfig, VoiceMode, VoiceModuleConfig, VoiceUiConfig, apply_env, ensure_defaults,
+    ensure_defaults_with_paths, load, load_config, load_config_from, load_with_paths,
 };
 pub use error::BecaError;
 pub use theme::{Theme, ThemeColors, ThemeMeta, ThemeMetrics, load_theme, load_theme_from};
@@ -97,7 +96,10 @@ mod tests {
         assert!(!paths.config_file.exists());
 
         let resolved = load_with_paths(paths.clone());
-        assert!(paths.config_file.is_file(), "config.toml should be auto-seeded");
+        assert!(
+            paths.config_file.is_file(),
+            "config.toml should be auto-seeded"
+        );
         assert!(
             paths.theme_file("default").is_file(),
             "themes/default.toml should be auto-seeded"

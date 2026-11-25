@@ -3,8 +3,8 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Mutex, OnceLock,
+    atomic::{AtomicBool, Ordering},
 };
 
 use slint::platform::software_renderer::MinimalSoftwareWindow;

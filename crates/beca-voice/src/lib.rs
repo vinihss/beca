@@ -2,8 +2,8 @@ use anyhow::{Result, bail};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixListener;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 fn run_voice_layer_shell_show(action: &str, args: &[String]) -> Result<()> {
     let force_window = std::env::var_os("BECA_VOICE_FORCE_WINDOW").is_some();
@@ -59,7 +59,9 @@ fn run_voice_layer_shell_show(action: &str, args: &[String]) -> Result<()> {
                         match status {
                             Ok(s) if s.success() => return Ok(()),
                             Ok(s) => {
-                                anyhow::bail!("voice layer-shell fallback process exited with status {s}")
+                                anyhow::bail!(
+                                    "voice layer-shell fallback process exited with status {s}"
+                                )
                             }
                             Err(err) => {
                                 anyhow::bail!("failed to spawn voice layer-shell fallback: {err}")
@@ -254,7 +256,9 @@ fn run_voice_quick(args: &[String]) -> Result<()> {
                         match status {
                             Ok(s) if s.success() => return Ok(()),
                             Ok(s) => {
-                                anyhow::bail!("quick layer-shell fallback process exited with status {s}")
+                                anyhow::bail!(
+                                    "quick layer-shell fallback process exited with status {s}"
+                                )
                             }
                             Err(err) => {
                                 anyhow::bail!("failed to spawn quick fallback: {err}")
@@ -326,7 +330,9 @@ fn run_voice_converse(args: &[String]) -> Result<()> {
                         match status {
                             Ok(s) if s.success() => return Ok(()),
                             Ok(s) => {
-                                anyhow::bail!("converse layer-shell fallback process exited with status {s}")
+                                anyhow::bail!(
+                                    "converse layer-shell fallback process exited with status {s}"
+                                )
                             }
                             Err(err) => {
                                 anyhow::bail!("failed to spawn converse fallback: {err}")
@@ -411,7 +417,9 @@ pub fn serve() -> Result<()> {
 
                 if !ui_defs.contains_key(component) {
                     match beca_ui::ui_loader::compile_component(component) {
-                        Ok(def) => { ui_defs.insert(component.to_string(), def); }
+                        Ok(def) => {
+                            ui_defs.insert(component.to_string(), def);
+                        }
                         Err(e) => {
                             eprintln!("[beca voice] compile {component} failed: {e}");
                         }
@@ -445,7 +453,6 @@ pub fn dispatch(action: &str, args: &[String]) -> Result<()> {
         "serve" => serve(),
         "show" => run_voice_layer_shell_show("show", args),
         "assistant" | "show-assistant" => {
-
             unsafe { std::env::set_var("BECA_VOICE_COMPONENT", "VoiceAssistantWindow") };
             let r = run_voice_layer_shell_show(action, args);
             unsafe { std::env::remove_var("BECA_VOICE_COMPONENT") };

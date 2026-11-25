@@ -89,7 +89,14 @@ fn position_for_target(target: &str, args: &[String]) -> Option<String> {
     let position = explicit
         .or_else(|| args.first().map(String::as_str))
         .unwrap_or("top");
-    Some(if position == "bottom" { "bottom" } else { "top" }.to_string())
+    Some(
+        if position == "bottom" {
+            "bottom"
+        } else {
+            "top"
+        }
+        .to_string(),
+    )
 }
 
 /// Handles `bar:*` module targets.

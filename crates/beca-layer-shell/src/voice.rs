@@ -5,29 +5,29 @@ use slint::platform::software_renderer::{MinimalSoftwareWindow, PremultipliedRgb
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
-    delegate_compositor, delegate_layer, delegate_output, delegate_pointer,
-    delegate_registry, delegate_seat, delegate_shm,
+    delegate_compositor, delegate_layer, delegate_output, delegate_pointer, delegate_registry,
+    delegate_seat, delegate_shm,
     output::{OutputHandler, OutputState},
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     seat::{
+        Capability, SeatHandler, SeatState,
         keyboard::{KeyEvent, KeyboardHandler, Modifiers, RepeatInfo},
         pointer::{PointerEvent, PointerEventKind, PointerHandler},
-        Capability, SeatHandler, SeatState,
     },
     shell::{
+        WaylandSurface,
         wlr_layer::{
             Anchor, KeyboardInteractivity, Layer, LayerShell, LayerShellHandler, LayerSurface,
             LayerSurfaceConfigure,
         },
-        WaylandSurface,
     },
-    shm::{slot::SlotPool, Shm, ShmHandler},
+    shm::{Shm, ShmHandler, slot::SlotPool},
 };
 use wayland_client::{
+    Connection, QueueHandle,
     globals::registry_queue_init,
     protocol::{wl_keyboard, wl_output, wl_pointer, wl_seat, wl_shm, wl_surface},
-    Connection, QueueHandle,
 };
 use xkeysym::Keysym;
 
@@ -78,7 +78,8 @@ impl VoiceState {
         layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
         layer.commit();
 
-        self.window.set_size(slint::PhysicalSize::new(WIDTH, HEIGHT));
+        self.window
+            .set_size(slint::PhysicalSize::new(WIDTH, HEIGHT));
         let pool = SlotPool::new((WIDTH * HEIGHT * 4) as usize, &self.shm)
             .map_err(|e| format!("shm pool: {e}"))?;
 
@@ -120,8 +121,12 @@ impl VoiceState {
     }
 
     fn draw_if_needed(&mut self) {
-        let Some(inst) = self.instance.as_mut() else { return };
-        if !inst.configured { return; }
+        let Some(inst) = self.instance.as_mut() else {
+            return;
+        };
+        if !inst.configured {
+            return;
+        }
 
         let width = inst.width.max(1);
         let height = inst.height.max(1);
@@ -137,7 +142,12 @@ impl VoiceState {
                 Err(_) => return,
             };
             let mut rgba = vec![
-                PremultipliedRgbaColor { red: 0, green: 0, blue: 0, alpha: 0 };
+                PremultipliedRgbaColor {
+                    red: 0,
+                    green: 0,
+                    blue: 0,
+                    alpha: 0
+                };
                 (width * height) as usize
             ];
             renderer.render(rgba.as_mut_slice(), width as usize);
@@ -150,7 +160,9 @@ impl VoiceState {
             inst.layer
                 .wl_surface()
                 .damage_buffer(0, 0, width as i32, height as i32);
-            inst.layer.wl_surface().frame(&self.qh, inst.layer.wl_surface().clone());
+            inst.layer
+                .wl_surface()
+                .frame(&self.qh, inst.layer.wl_surface().clone());
             let _ = buffer.attach_to(inst.layer.wl_surface());
             inst.layer.commit();
         });
@@ -167,8 +179,8 @@ pub fn run_voice_layer_shell(window: Rc<MinimalSoftwareWindow>) -> Result<(), St
 
     let compositor =
         CompositorState::bind(&globals, &qh).map_err(|e| format!("wl_compositor: {e}"))?;
-    let layer_shell = LayerShell::bind(&globals, &qh)
-        .map_err(|e| format!("wlr-layer-shell unavailable: {e}"))?;
+    let layer_shell =
+        LayerShell::bind(&globals, &qh).map_err(|e| format!("wlr-layer-shell unavailable: {e}"))?;
     let shm = Shm::bind(&globals, &qh).map_err(|e| format!("wl_shm: {e}"))?;
 
     let mut state = VoiceState {
@@ -188,7 +200,6 @@ pub fn run_voice_layer_shell(window: Rc<MinimalSoftwareWindow>) -> Result<(), St
     };
 
     loop {
-
         crate::platform::drain_pending_closures();
         slint::platform::update_timers_and_animations();
         if crate::platform::quit_requested() || state.exit {
@@ -213,13 +224,36 @@ pub fn run_voice_layer_shell(window: Rc<MinimalSoftwareWindow>) -> Result<(), St
 }
 
 impl CompositorHandler for VoiceState {
-    fn scale_factor_changed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: i32) {}
-    fn transform_changed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: wl_output::Transform) {}
-    fn frame(&mut self, _: &Connection, _qh: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: u32) {}
+    fn scale_factor_changed(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &wl_surface::WlSurface,
+        _: i32,
+    ) {
+    }
+    fn transform_changed(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &wl_surface::WlSurface,
+        _: wl_output::Transform,
+    ) {
+    }
+    fn frame(
+        &mut self,
+        _: &Connection,
+        _qh: &QueueHandle<Self>,
+        _: &wl_surface::WlSurface,
+        _: u32,
+    ) {
+    }
 }
 
 impl OutputHandler for VoiceState {
-    fn output_state(&mut self) -> &mut OutputState { &mut self.output_state }
+    fn output_state(&mut self) -> &mut OutputState {
+        &mut self.output_state
+    }
     fn new_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
     fn update_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
     fn output_destroyed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
@@ -245,9 +279,12 @@ impl LayerShellHandler for VoiceState {
             inst.height = if h > 0 { h } else { HEIGHT };
             inst.configured = true;
             Some((inst.width, inst.height))
-        } else { None };
+        } else {
+            None
+        };
         if let Some((width, height)) = dims {
-            self.window.set_size(slint::PhysicalSize::new(width, height));
+            self.window
+                .set_size(slint::PhysicalSize::new(width, height));
             let needed = (width as usize) * (height as usize) * 4;
             if let Ok(new_pool) = SlotPool::new(needed.max(4096), &self.shm)
                 && let Some(inst) = self.instance_for_layer_mut(layer)
@@ -260,7 +297,9 @@ impl LayerShellHandler for VoiceState {
 }
 
 impl SeatHandler for VoiceState {
-    fn seat_state(&mut self) -> &mut SeatState { &mut self.seat_state }
+    fn seat_state(&mut self) -> &mut SeatState {
+        &mut self.seat_state
+    }
     fn new_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
     fn new_capability(
         &mut self,
@@ -269,12 +308,14 @@ impl SeatHandler for VoiceState {
         seat: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Pointer && self.pointer.is_none()
+        if capability == Capability::Pointer
+            && self.pointer.is_none()
             && let Ok(pointer) = self.seat_state.get_pointer(qh, &seat)
         {
             self.pointer = Some(pointer);
         }
-        if capability == Capability::Keyboard && self.keyboard.is_none()
+        if capability == Capability::Keyboard
+            && self.keyboard.is_none()
             && let Ok(kb) = self.seat_state.get_keyboard(qh, &seat, None)
         {
             self.keyboard = Some(kb);
@@ -287,10 +328,14 @@ impl SeatHandler for VoiceState {
         _: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Pointer && let Some(pointer) = self.pointer.take() {
+        if capability == Capability::Pointer
+            && let Some(pointer) = self.pointer.take()
+        {
             pointer.release();
         }
-        if capability == Capability::Keyboard && let Some(kb) = self.keyboard.take() {
+        if capability == Capability::Keyboard
+            && let Some(kb) = self.keyboard.take()
+        {
             kb.release();
         }
     }
@@ -307,30 +352,47 @@ impl PointerHandler for VoiceState {
     ) {
         use PointerEventKind::*;
         for event in events {
-            if !self.instance_for_surface(&event.surface) { continue; }
+            if !self.instance_for_surface(&event.surface) {
+                continue;
+            }
             let pos = slint::LogicalPosition::new(event.position.0 as f32, event.position.1 as f32);
             match event.kind {
                 Enter { .. } | Motion { .. } => {
-                    self.window.dispatch_event(WindowEvent::PointerMoved { position: pos });
+                    self.window
+                        .dispatch_event(WindowEvent::PointerMoved { position: pos });
                 }
                 Leave { .. } => {
                     self.window.dispatch_event(WindowEvent::PointerExited);
                 }
                 Press { button, .. } => {
                     if let Some(btn) = map_button(button) {
-                        self.window.dispatch_event(WindowEvent::PointerPressed { position: pos, button: btn });
+                        self.window.dispatch_event(WindowEvent::PointerPressed {
+                            position: pos,
+                            button: btn,
+                        });
                     }
                 }
                 Release { button, .. } => {
                     if let Some(btn) = map_button(button) {
-                        self.window.dispatch_event(WindowEvent::PointerReleased { position: pos, button: btn });
+                        self.window.dispatch_event(WindowEvent::PointerReleased {
+                            position: pos,
+                            button: btn,
+                        });
                     }
                 }
-                Axis { horizontal, vertical, .. } => {
+                Axis {
+                    horizontal,
+                    vertical,
+                    ..
+                } => {
                     let dx = -horizontal.absolute as f32;
                     let dy = -vertical.absolute as f32;
                     if dx != 0.0 || dy != 0.0 {
-                        self.window.dispatch_event(WindowEvent::PointerScrolled { position: pos, delta_x: dx, delta_y: dy });
+                        self.window.dispatch_event(WindowEvent::PointerScrolled {
+                            position: pos,
+                            delta_x: dx,
+                            delta_y: dy,
+                        });
                     }
                 }
             }
@@ -352,7 +414,8 @@ impl KeyboardHandler for VoiceState {
     ) {
         if self.instance_for_surface(surface) {
             self.keyboard_focused = true;
-            self.window.dispatch_event(WindowEvent::WindowActiveChanged(true));
+            self.window
+                .dispatch_event(WindowEvent::WindowActiveChanged(true));
         }
     }
     fn leave(
@@ -365,7 +428,8 @@ impl KeyboardHandler for VoiceState {
     ) {
         if self.instance_for_surface(surface) {
             self.keyboard_focused = false;
-            self.window.dispatch_event(WindowEvent::WindowActiveChanged(false));
+            self.window
+                .dispatch_event(WindowEvent::WindowActiveChanged(false));
         }
     }
     fn press_key(
@@ -376,7 +440,9 @@ impl KeyboardHandler for VoiceState {
         _serial: u32,
         event: KeyEvent,
     ) {
-        if !self.keyboard_focused { return; }
+        if !self.keyboard_focused {
+            return;
+        }
         if let Some(text) = keysym_to_slint_text(&event) {
             self.window.dispatch_event(WindowEvent::KeyPressed { text });
         }
@@ -390,18 +456,38 @@ impl KeyboardHandler for VoiceState {
         _serial: u32,
         event: KeyEvent,
     ) {
-        if !self.keyboard_focused { return; }
+        if !self.keyboard_focused {
+            return;
+        }
         if let Some(text) = keysym_to_slint_text(&event) {
-            self.window.dispatch_event(WindowEvent::KeyReleased { text });
+            self.window
+                .dispatch_event(WindowEvent::KeyReleased { text });
         }
         self.window.request_redraw();
     }
-    fn update_modifiers(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_keyboard::WlKeyboard, _serial: u32, _modifiers: Modifiers) {}
-    fn update_repeat_info(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_keyboard::WlKeyboard, _info: RepeatInfo) {}
+    fn update_modifiers(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &wl_keyboard::WlKeyboard,
+        _serial: u32,
+        _modifiers: Modifiers,
+    ) {
+    }
+    fn update_repeat_info(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &wl_keyboard::WlKeyboard,
+        _info: RepeatInfo,
+    ) {
+    }
 }
 
 impl ShmHandler for VoiceState {
-    fn shm_state(&mut self) -> &mut Shm { &mut self.shm }
+    fn shm_state(&mut self) -> &mut Shm {
+        &mut self.shm
+    }
 }
 
 delegate_compositor!(VoiceState);
@@ -414,7 +500,9 @@ delegate_pointer!(VoiceState);
 delegate_seat!(VoiceState);
 
 impl ProvidesRegistryState for VoiceState {
-    fn registry(&mut self) -> &mut RegistryState { &mut self.registry_state }
+    fn registry(&mut self) -> &mut RegistryState {
+        &mut self.registry_state
+    }
     registry_handlers![OutputState, SeatState];
 }
 
@@ -444,9 +532,16 @@ fn keysym_to_slint_text(event: &KeyEvent) -> Option<slint::SharedString> {
         Keysym::Page_Down | Keysym::KP_Page_Down => Some(Key::PageDown.into()),
         _ => None,
     };
-    if special.is_some() { return special; }
-    if let Some(ref utf8) = event.utf8 && !utf8.is_empty() {
+    if special.is_some() {
+        return special;
+    }
+    if let Some(ref utf8) = event.utf8
+        && !utf8.is_empty()
+    {
         return Some(slint::SharedString::from(utf8.as_str()));
     }
-    event.keysym.key_char().map(|c| slint::SharedString::from(c.to_string().as_str()))
+    event
+        .keysym
+        .key_char()
+        .map(|c| slint::SharedString::from(c.to_string().as_str()))
 }

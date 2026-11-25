@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::theme::{load_theme, Theme};
+use crate::theme::{Theme, load_theme};
 
 pub const DEFAULT_CONFIG_TOML: &str = include_str!("../../../docs/schema/config.example.toml");
 pub const DEFAULT_THEME_TOML: &str =
@@ -93,7 +93,6 @@ pub struct Config {
     pub widget: WidgetsConfig,
 }
 
-
 impl Config {
     pub fn bar_config_for(&self, position: &str) -> BarModuleConfig {
         self.bar.config_for(position)
@@ -126,7 +125,6 @@ pub struct ShellConfig {}
 pub struct ModulesConfig {
     pub voice: VoiceModuleConfig,
 }
-
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -248,7 +246,6 @@ pub struct WidgetsConfig {
     pub launcher: LauncherWidgetConfig,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ClockWidgetConfig {
@@ -285,7 +282,6 @@ pub enum VoiceMode {
     Pipe,
     Hold,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]

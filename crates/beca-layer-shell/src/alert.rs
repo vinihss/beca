@@ -14,13 +14,13 @@ use smithay_client_toolkit::{
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     shell::{
+        WaylandSurface,
         wlr_layer::{
             Anchor, KeyboardInteractivity, Layer, LayerShell, LayerShellHandler, LayerSurface,
             LayerSurfaceConfigure,
         },
-        WaylandSurface,
     },
-    shm::{slot::SlotPool, Shm, ShmHandler},
+    shm::{Shm, ShmHandler, slot::SlotPool},
 };
 use wayland_client::{
     Connection, QueueHandle,
@@ -75,7 +75,8 @@ impl AlertState {
         }
 
         // Empty input region: the alert is informational and must not steal pointer input.
-        let input_region = Region::new(&self.compositor).map_err(|e| format!("input region: {e}"))?;
+        let input_region =
+            Region::new(&self.compositor).map_err(|e| format!("input region: {e}"))?;
         let surface = self.compositor.create_surface(&self.qh);
         let layer = self.layer_shell.create_layer_surface(
             &self.qh,
@@ -112,7 +113,9 @@ impl AlertState {
     }
 
     fn draw_if_needed(&mut self) {
-        let Some(inst) = self.instance.as_mut() else { return };
+        let Some(inst) = self.instance.as_mut() else {
+            return;
+        };
         if !inst.configured {
             return;
         }
@@ -131,7 +134,12 @@ impl AlertState {
                 Err(_) => return,
             };
             let mut rgba = vec![
-                PremultipliedRgbaColor { red: 0, green: 0, blue: 0, alpha: 0 };
+                PremultipliedRgbaColor {
+                    red: 0,
+                    green: 0,
+                    blue: 0,
+                    alpha: 0
+                };
                 (width * height) as usize
             ];
             renderer.render(rgba.as_mut_slice(), width as usize);
@@ -171,7 +179,10 @@ pub fn run_alert(options: &AlertOptions) -> Result<(), String> {
             .map_err(|e| format!("set {name}: {e}"))
     };
     set("title-text", Value::String(options.title.clone().into()))?;
-    set("message-text", Value::String(options.message.clone().into()))?;
+    set(
+        "message-text",
+        Value::String(options.message.clone().into()),
+    )?;
     set("timeout", Value::Number(options.timeout_ms as f64))?;
     if let Some(accent) = options.accent {
         set("accent-color", Value::Brush(accent.into()))?;
@@ -198,8 +209,8 @@ fn run_alert_surface(window: Rc<MinimalSoftwareWindow>) -> Result<(), String> {
 
     let compositor =
         CompositorState::bind(&globals, &qh).map_err(|e| format!("wl_compositor: {e}"))?;
-    let layer_shell = LayerShell::bind(&globals, &qh)
-        .map_err(|e| format!("wlr-layer-shell unavailable: {e}"))?;
+    let layer_shell =
+        LayerShell::bind(&globals, &qh).map_err(|e| format!("wlr-layer-shell unavailable: {e}"))?;
     let shm = Shm::bind(&globals, &qh).map_err(|e| format!("wl_shm: {e}"))?;
 
     let mut state = AlertState {
@@ -293,7 +304,8 @@ impl LayerShellHandler for AlertState {
             None
         };
         if let Some((width, height)) = dims {
-            self.window.set_size(slint::PhysicalSize::new(width, height));
+            self.window
+                .set_size(slint::PhysicalSize::new(width, height));
             let needed = (width as usize) * (height as usize) * 4;
             if let Ok(new_pool) = SlotPool::new(needed.max(4096), &self.shm)
                 && let Some(inst) = self.instance_for_layer_mut(layer)

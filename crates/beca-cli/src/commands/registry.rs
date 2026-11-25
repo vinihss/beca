@@ -4,7 +4,10 @@ pub fn list_modules() -> Vec<(&'static str, &'static str)> {
         ("alert", "One-shot layer-shell alert overlay"),
         ("bar", "Status bar (top/bottom) with widgets and layout"),
         ("launcher", "Application launcher overlay"),
-        ("voice", "Voice capture, quick prompt, conversation and assistant"),
+        (
+            "voice",
+            "Voice capture, quick prompt, conversation and assistant",
+        ),
     ]
 }
 

@@ -425,9 +425,10 @@ pub fn read_disk() -> String {
     {
         let s = String::from_utf8_lossy(&o.stdout);
         if let Some(line) = s.lines().nth(1)
-            && let Some(pct) = line.split_whitespace().nth(4) {
-                return pct.to_string();
-            }
+            && let Some(pct) = line.split_whitespace().nth(4)
+        {
+            return pct.to_string();
+        }
     }
     "--%".into()
 }

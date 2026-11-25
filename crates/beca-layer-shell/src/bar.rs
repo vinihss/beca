@@ -395,7 +395,9 @@ impl SeatHandler for BarState {
         _: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Pointer && let Some(pointer) = self.pointer.take() {
+        if capability == Capability::Pointer
+            && let Some(pointer) = self.pointer.take()
+        {
             pointer.release();
         }
     }

@@ -64,7 +64,6 @@ impl Default for ThemeTokens {
 }
 
 impl ThemeTokens {
-
     pub fn from_voice_theme(t: &VoiceTheme) -> Self {
         let d = Self::default();
         let color = |hex: &str, fallback: Color| parse_color(hex).unwrap_or(fallback);
@@ -140,9 +139,15 @@ mod tests {
     #[test]
     fn parses_rgb_and_rgba() {
         let rgb = parse_color("#1E1E1E").expect("rgb");
-        assert_eq!((rgb.red(), rgb.green(), rgb.blue(), rgb.alpha()), (30, 30, 30, 255));
+        assert_eq!(
+            (rgb.red(), rgb.green(), rgb.blue(), rgb.alpha()),
+            (30, 30, 30, 255)
+        );
         let rgba = parse_color("1E1E1EB8").expect("rgba");
-        assert_eq!((rgba.red(), rgba.green(), rgba.blue(), rgba.alpha()), (30, 30, 30, 184));
+        assert_eq!(
+            (rgba.red(), rgba.green(), rgba.blue(), rgba.alpha()),
+            (30, 30, 30, 184)
+        );
         assert!(parse_color("#12345").is_none());
         assert!(parse_color("not-a-color").is_none());
     }

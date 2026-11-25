@@ -4,10 +4,10 @@
 //! (127.0.0.1:4100) to be running. Ignored by default: run with
 //! `cargo test -p beca-ui --test streaming_live -- --ignored --nocapture`.
 
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
-use beca_ui::voice::streaming::{stream_and_speak, StreamOptions};
+use beca_ui::voice::streaming::{StreamOptions, stream_and_speak};
 
 #[test]
 #[ignore = "requires live q-rs server and voice daemon"]
@@ -22,9 +22,14 @@ fn streams_answer_and_speaks_chunks() {
     let cancel = Arc::new(AtomicBool::new(false));
     let seen = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
 
-    let answer = stream_and_speak(&opts, "talk about the sea in 3 short sentences", &cancel, &|partial| {
-        seen.lock().unwrap().push(partial.to_string());
-    })
+    let answer = stream_and_speak(
+        &opts,
+        "talk about the sea in 3 short sentences",
+        &cancel,
+        &|partial| {
+            seen.lock().unwrap().push(partial.to_string());
+        },
+    )
     .expect("streaming failed");
 
     assert!(!answer.trim().is_empty(), "answer is empty");

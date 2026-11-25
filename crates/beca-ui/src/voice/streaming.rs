@@ -1,7 +1,7 @@
 use std::io::{BufRead, BufReader};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{sync_channel, Receiver};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{Receiver, sync_channel};
 use std::thread;
 use std::time::Instant;
 
@@ -9,7 +9,6 @@ use serde_json::Value as JsonValue;
 
 #[derive(Clone, Debug, Default)]
 pub struct StreamOptions {
-
     pub llm_url: String,
 
     pub model: String,
@@ -45,7 +44,10 @@ pub fn stream_and_speak(
         if first_token_at.is_none() {
             let at = Instant::now();
             first_token_at = Some(at);
-            eprintln!("[voice][timing] llm ttft {:?}", at.duration_since(t_pipeline));
+            eprintln!(
+                "[voice][timing] llm ttft {:?}",
+                at.duration_since(t_pipeline)
+            );
         }
         answer.push_str(delta);
         on_text(&answer);
@@ -67,7 +69,10 @@ pub fn stream_and_speak(
     }
     drop(tx);
     let _ = tts.join();
-    eprintln!("[voice][timing] respond pipeline {:?}", t_pipeline.elapsed());
+    eprintln!(
+        "[voice][timing] respond pipeline {:?}",
+        t_pipeline.elapsed()
+    );
 
     match error {
         Some(e) => Err(e),
@@ -89,7 +94,9 @@ fn is_abbreviation(prefix: &str) -> bool {
         return false;
     }
     let normalized = token.to_lowercase();
-    if normalized.chars().count() == 1 && normalized.chars().next().is_some_and(|c| c.is_alphabetic()) {
+    if normalized.chars().count() == 1
+        && normalized.chars().next().is_some_and(|c| c.is_alphabetic())
+    {
         return true;
     }
     ABBREVIATIONS.contains(&normalized.as_str())
@@ -180,7 +187,10 @@ fn read_sse(
         let Ok(event) = serde_json::from_str::<JsonValue>(data) else {
             continue;
         };
-        if let Some(err) = event.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str())
+        if let Some(err) = event
+            .get("error")
+            .and_then(|e| e.get("message"))
+            .and_then(|m| m.as_str())
         {
             return Err(format!("llm stream error: {err}"));
         }
@@ -230,12 +240,38 @@ fn strip_drop_tokens(text: &str) -> String {
 
 fn pt_under_100(n: u64) -> String {
     const UNITS: [&str; 20] = [
-        "zero", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove",
-        "dez", "onze", "doze", "treze", "catorze", "quinze", "dezesseis", "dezessete",
-        "dezoito", "dezenove",
+        "zero",
+        "um",
+        "dois",
+        "três",
+        "quatro",
+        "cinco",
+        "seis",
+        "sete",
+        "oito",
+        "nove",
+        "dez",
+        "onze",
+        "doze",
+        "treze",
+        "catorze",
+        "quinze",
+        "dezesseis",
+        "dezessete",
+        "dezoito",
+        "dezenove",
     ];
     const TENS: [&str; 10] = [
-        "", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa",
+        "",
+        "",
+        "vinte",
+        "trinta",
+        "quarenta",
+        "cinquenta",
+        "sessenta",
+        "setenta",
+        "oitenta",
+        "noventa",
     ];
     if n < 20 {
         return UNITS[n as usize].to_string();
@@ -251,8 +287,16 @@ fn pt_under_100(n: u64) -> String {
 
 fn pt_under_1000(n: u64) -> String {
     const HUNDREDS: [&str; 10] = [
-        "", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos",
-        "setecentos", "oitocentos", "novecentos",
+        "",
+        "cento",
+        "duzentos",
+        "trezentos",
+        "quatrocentos",
+        "quinhentos",
+        "seiscentos",
+        "setecentos",
+        "oitocentos",
+        "novecentos",
     ];
     if n == 100 {
         return "cem".to_string();
@@ -274,11 +318,19 @@ fn pt_rest(n: u64) -> String {
     if thousands == 0 {
         return pt_under_1000(rest);
     }
-    let head = if thousands == 1 { "mil".to_string() } else { format!("{} mil", pt_under_1000(thousands)) };
+    let head = if thousands == 1 {
+        "mil".to_string()
+    } else {
+        format!("{} mil", pt_under_1000(thousands))
+    };
     if rest == 0 {
         return head;
     }
-    let sep = if rest < 100 || rest.is_multiple_of(100) { " e " } else { " " };
+    let sep = if rest < 100 || rest.is_multiple_of(100) {
+        " e "
+    } else {
+        " "
+    };
     format!("{head}{sep}{}", pt_under_1000(rest))
 }
 
@@ -299,7 +351,11 @@ fn pt_int_words(n: u64) -> String {
     if rest == 0 {
         return head;
     }
-    let sep = if rest < 100 || rest.is_multiple_of(100) { " e " } else { " " };
+    let sep = if rest < 100 || rest.is_multiple_of(100) {
+        " e "
+    } else {
+        " "
+    };
     format!("{head}{sep}{}", pt_rest(rest))
 }
 
@@ -395,7 +451,10 @@ fn wordify_numbers(text: &str) -> String {
 
 fn sanitize_for_speech(text: &str) -> String {
     let mut out = strip_drop_tokens(text);
-    for ch in ['*', '#', '`', '_', '~', '[', ']', '{', '}', '<', '>', '|', '•', '"', '\'', '“', '”', '‘', '’', '«', '»', '(', ')', '/', '→'] {
+    for ch in [
+        '*', '#', '`', '_', '~', '[', ']', '{', '}', '<', '>', '|', '•', '"', '\'', '“', '”', '‘',
+        '’', '«', '»', '(', ')', '/', '→',
+    ] {
         out = out.replace(ch, " ");
     }
     for ch in ["R$", "US$", "U$", "$"] {
@@ -416,7 +475,9 @@ fn sanitize_for_speech(text: &str) -> String {
         collapsed.push(ch);
         last_space = false;
     }
-    let mut s = collapsed.trim_matches(|c| c == ' ' || c == ',' || c == '.').to_string();
+    let mut s = collapsed
+        .trim_matches(|c| c == ' ' || c == ',' || c == '.')
+        .to_string();
     while s.contains(", ,") {
         s = s.replace(", ,", ",");
     }
@@ -497,7 +558,8 @@ mod tests {
         assert!(take_chunk("fale com Dr. Silva e me avise hoje cedo").is_none());
         assert!(take_chunk("a Sra. Maria ligou agora a pouco").is_none());
         assert!(take_chunk("conforme a ref. 123 do processo").is_none());
-        let (chunk, rest) = take_chunk("fale com Dr. Silva. depois avise a equipe toda").expect("chunk");
+        let (chunk, rest) =
+            take_chunk("fale com Dr. Silva. depois avise a equipe toda").expect("chunk");
         assert_eq!(chunk, "fale com Dr. Silva.");
         assert_eq!(rest, "depois avise a equipe toda");
     }
@@ -512,7 +574,10 @@ mod tests {
     #[test]
     fn sanitize_strips_markdown_and_symbols() {
         assert_eq!(sanitize_for_speech("*bold* and `code`"), "bold and code");
-        assert_eq!(sanitize_for_speech("(test) [array] {map}"), "test array map");
+        assert_eq!(
+            sanitize_for_speech("(test) [array] {map}"),
+            "test array map"
+        );
         assert_eq!(sanitize_for_speech("olá — tudo bem?"), "olá tudo bem?");
         assert_eq!(sanitize_for_speech("a/b"), "a b");
         assert_eq!(sanitize_for_speech("“quote”"), "quote");
@@ -520,17 +585,35 @@ mod tests {
 
     #[test]
     fn sanitize_drops_urls_and_emails() {
-        assert_eq!(sanitize_for_speech("veja www.example.com agora"), "veja agora");
-        assert_eq!(sanitize_for_speech("acesse https://example.com/a?b=1 fim"), "acesse fim");
-        assert_eq!(sanitize_for_speech("escreva para me@example.com hoje"), "escreva para hoje");
+        assert_eq!(
+            sanitize_for_speech("veja www.example.com agora"),
+            "veja agora"
+        );
+        assert_eq!(
+            sanitize_for_speech("acesse https://example.com/a?b=1 fim"),
+            "acesse fim"
+        );
+        assert_eq!(
+            sanitize_for_speech("escreva para me@example.com hoje"),
+            "escreva para hoje"
+        );
     }
 
     #[test]
     fn sanitize_wordifies_pt_numbers() {
-        assert_eq!(sanitize_for_speech("custa 2500 reais"), "custa dois mil e quinhentos reais");
+        assert_eq!(
+            sanitize_for_speech("custa 2500 reais"),
+            "custa dois mil e quinhentos reais"
+        );
         assert_eq!(sanitize_for_speech("hoje é 15"), "hoje é quinze");
-        assert_eq!(sanitize_for_speech("R$ 1.234,00"), "reais mil duzentos e trinta e quatro");
-        assert_eq!(sanitize_for_speech("3,5 por cento"), "três vírgula cinco por cento");
+        assert_eq!(
+            sanitize_for_speech("R$ 1.234,00"),
+            "reais mil duzentos e trinta e quatro"
+        );
+        assert_eq!(
+            sanitize_for_speech("3,5 por cento"),
+            "três vírgula cinco por cento"
+        );
         assert_eq!(sanitize_for_speech("50%"), "cinquenta por cento");
         assert_eq!(sanitize_for_speech("1.000.000"), "um milhão");
         assert_eq!(sanitize_for_speech("2.500"), "dois mil e quinhentos");
@@ -542,7 +625,10 @@ mod tests {
 
     #[test]
     fn sanitize_handles_ranges_and_negatives() {
-        assert_eq!(sanitize_for_speech("de 10-20 itens"), "de dez a vinte itens");
+        assert_eq!(
+            sanitize_for_speech("de 10-20 itens"),
+            "de dez a vinte itens"
+        );
         assert_eq!(sanitize_for_speech("-3 graus"), "menos três graus");
     }
 

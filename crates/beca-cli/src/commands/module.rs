@@ -23,7 +23,9 @@ pub fn execute(target: &str, local: bool, args: &[String]) -> Result<()> {
     }
 
     let no_daemon = local || std::env::var_os("BECA_NO_DAEMON").is_some();
-    if !no_daemon && module != "alert" && target != "voice:transcribe"
+    if !no_daemon
+        && module != "alert"
+        && target != "voice:transcribe"
         && let Some(response) = beca_daemon::try_route_mod(target, args)
     {
         output::ok_or_error(&response, "daemon routing failed")?;

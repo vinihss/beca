@@ -52,7 +52,6 @@ fn load_behavior_script() -> (String, String) {
 
 #[derive(Debug, Clone)]
 pub struct Args {
-
     pub output: Option<PathBuf>,
 
     pub input: Option<PathBuf>,
@@ -252,7 +251,6 @@ fn persist_voice_setting(key: &str, value: &str) {
         let trimmed = line.trim();
         if trimmed.starts_with('[') {
             if in_voice && !replaced {
-
                 out.push_str(&format!("{key} = {value}\n"));
                 replaced = true;
             }
@@ -279,7 +277,12 @@ fn persist_voice_setting(key: &str, value: &str) {
     let _ = fs::write(path, out);
 }
 
-pub(crate) fn write_wav(path: &Path, samples: &[f32], channels: u16, sample_rate: u32) -> Result<(), String> {
+pub(crate) fn write_wav(
+    path: &Path,
+    samples: &[f32],
+    channels: u16,
+    sample_rate: u32,
+) -> Result<(), String> {
     let spec = hound::WavSpec {
         channels,
         sample_rate,
@@ -455,7 +458,12 @@ pub(crate) fn generate_response(
     active_child: &Arc<Mutex<Option<std::process::Child>>>,
 ) -> Result<String, String> {
     if !cfg.respond_command.trim().is_empty() {
-        return run_shell_stdout(&cfg.respond_command, &[("TRANSCRIPT", transcript)], cancel, active_child);
+        return run_shell_stdout(
+            &cfg.respond_command,
+            &[("TRANSCRIPT", transcript)],
+            cancel,
+            active_child,
+        );
     }
 
     let script = r#"
@@ -554,7 +562,11 @@ exit 127
     run_shell_status(script, &[("TEXT", text)], cancel, active_child)
 }
 
-pub(crate) fn animate_waveform(recent: &Arc<Mutex<Vec<f32>>>, running: &Arc<AtomicBool>, speaking: bool) {
+pub(crate) fn animate_waveform(
+    recent: &Arc<Mutex<Vec<f32>>>,
+    running: &Arc<AtomicBool>,
+    speaking: bool,
+) {
     let mut t = 0.0f32;
     while running.load(Ordering::Relaxed) {
         if let Ok(mut r) = recent.lock() {
@@ -763,7 +775,6 @@ pub fn apply_theme(app: &ComponentInstance, t: &VoiceTheme) {
 }
 
 fn start_position_keeper(win_w: i32, running: Arc<AtomicBool>) {
-
     let script = format!(
         r#"
 while :; do
@@ -837,15 +848,12 @@ pub fn run_capture_ui_with(
     theme: VoiceTheme,
     ui_texts: VoiceUiTexts,
 ) -> Result<CaptureOutcome, String> {
-
     {
         let base_url = base_url.to_string();
         std::thread::spawn(move || {
-
             let url = format!("{}/health", base_url.trim_end_matches('/'));
             let _ = ureq::get(&url).call();
             if respond {
-
                 let _ = std::process::Command::new("bash")
                     .arg("-c")
                     .arg("command -v q-context_builder >/dev/null && q-context_builder assist >/dev/null 2>&1; command -v q-rs >/dev/null && q-rs run 'ping' >/dev/null 2>&1")
@@ -862,14 +870,23 @@ pub fn run_capture_ui_with(
     let device = host
         .default_input_device()
         .ok_or_else(|| "no capture device (microphone not found)".to_string())?;
-    eprintln!("[voice][timing] audio device selected in {:?}", t_step.elapsed());
+    eprintln!(
+        "[voice][timing] audio device selected in {:?}",
+        t_step.elapsed()
+    );
     let t_step = std::time::Instant::now();
     let (config, sample_format) = pick_input_config(&device)?;
     let channels = config.channels;
     let sample_rate = config.sample_rate.0;
-    eprintln!("[voice][timing] audio config picked in {:?}", t_step.elapsed());
+    eprintln!(
+        "[voice][timing] audio config picked in {:?}",
+        t_step.elapsed()
+    );
 
-    eprintln!("[voice] preparing capture device ({channels}ch {sample_rate}Hz, {sample_format:?}) (total {:?})", t0.elapsed());
+    eprintln!(
+        "[voice] preparing capture device ({channels}ch {sample_rate}Hz, {sample_format:?}) (total {:?})",
+        t0.elapsed()
+    );
 
     let recorded: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
     let recent: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(vec![0.0f32; 508]));
@@ -889,7 +906,11 @@ pub fn run_capture_ui_with(
     stream.play().map_err(|e| e.to_string())?;
     let _ = stream.pause();
     let stream = Rc::new(stream);
-    eprintln!("[voice][timing] audio stream ready(paused) in {:?} (total {:?})", t_step.elapsed(), t0.elapsed());
+    eprintln!(
+        "[voice][timing] audio stream ready(paused) in {:?} (total {:?})",
+        t_step.elapsed(),
+        t0.elapsed()
+    );
 
     let t_step = std::time::Instant::now();
     let component_name = std::env::var("BECA_VOICE_COMPONENT")
@@ -897,7 +918,11 @@ pub fn run_capture_ui_with(
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| "VoiceCaptureWindow".to_string());
     let app = ui_loader::create(&component_name).map_err(|e| e.to_string())?;
-    eprintln!("[voice][timing] ui create in {:?} (total {:?})", t_step.elapsed(), t0.elapsed());
+    eprintln!(
+        "[voice][timing] ui create in {:?} (total {:?})",
+        t_step.elapsed(),
+        t0.elapsed()
+    );
     ui_loader::apply_theme_global(&app, &theme);
     apply_state(&app, &behavior.idle());
     let view = VoiceView::new(&app);
@@ -938,7 +963,6 @@ pub fn run_capture_ui_with(
             }
 
             if !recording.load(Ordering::Relaxed) {
-
                 if let Ok(mut all) = recorded.lock() {
                     all.clear();
                 }
@@ -992,7 +1016,8 @@ pub fn run_capture_ui_with(
             };
             thread::spawn(move || {
                 let is_stale = || {
-                    generation.load(Ordering::SeqCst) != my_gen || cancel_flag.load(Ordering::Relaxed)
+                    generation.load(Ordering::SeqCst) != my_gen
+                        || cancel_flag.load(Ordering::Relaxed)
                 };
                 if is_stale() {
                     return;
@@ -1015,7 +1040,6 @@ pub fn run_capture_ui_with(
 
                 match result {
                     Ok(text) if respond_now => {
-
                         let transcript = text.clone();
                         let st = responding_state.clone();
                         let _ = weak.upgrade_in_event_loop(move |app| {
@@ -1026,10 +1050,11 @@ pub fn run_capture_ui_with(
                         let anim_run = Arc::new(AtomicBool::new(true));
                         let anim_flag = anim_run.clone();
                         let recent_anim = recent_for_send.clone();
-                        let anim_handle = thread::spawn(move || animate_waveform(&recent_anim, &anim_flag, false));
+                        let anim_handle = thread::spawn(move || {
+                            animate_waveform(&recent_anim, &anim_flag, false)
+                        });
 
                         if respond_cfg.respond_stream {
-
                             let resp = generate_response_streaming(
                                 &transcript,
                                 &respond_cfg,
@@ -1092,7 +1117,12 @@ pub fn run_capture_ui_with(
                             return;
                         }
 
-                        let resp = generate_response(&transcript, &respond_cfg, &cancel_flag, &active_child);
+                        let resp = generate_response(
+                            &transcript,
+                            &respond_cfg,
+                            &cancel_flag,
+                            &active_child,
+                        );
                         anim_run.store(false, Ordering::Relaxed);
                         let _ = anim_handle.join();
                         if is_stale() {
@@ -1114,8 +1144,15 @@ pub fn run_capture_ui_with(
                                 let anim_run = Arc::new(AtomicBool::new(true));
                                 let anim_flag = anim_run.clone();
                                 let recent_anim = recent_for_send.clone();
-                                let anim_handle = thread::spawn(move || animate_waveform(&recent_anim, &anim_flag, true));
-                                let tts_res = speak_response(&answer, &respond_cfg, &cancel_flag, &active_child);
+                                let anim_handle = thread::spawn(move || {
+                                    animate_waveform(&recent_anim, &anim_flag, true)
+                                });
+                                let tts_res = speak_response(
+                                    &answer,
+                                    &respond_cfg,
+                                    &cancel_flag,
+                                    &active_child,
+                                );
                                 anim_run.store(false, Ordering::Relaxed);
                                 let _ = anim_handle.join();
                                 if is_stale() {
@@ -1227,7 +1264,6 @@ pub fn run_capture_ui_with(
         let recent_for_stop = recent.clone();
         let stream_ctl = stream.clone();
         let _ = app.set_callback("cancel", move |_args| {
-
             generation.fetch_add(1, Ordering::SeqCst);
             cancel_flag.store(true, Ordering::SeqCst);
             recording.store(false, Ordering::Relaxed);
@@ -1379,7 +1415,6 @@ pub fn run_capture_ui_with(
     });
 
     if let Some(c) = ui_loader::parse_color(&theme.background) {
-
         let a = ((c.alpha() as f32) * 0.72).round().clamp(40.0, 255.0) as u8;
         let tc = slint_interpreter::Color::from_argb_u8(a, c.red(), c.green(), c.blue());
         let _ = app.set_global_property("Theme", "background", Value::Brush(tc.into()));
@@ -1406,7 +1441,6 @@ pub fn run_capture_ui_with(
         let focus_watch_flag = focus_watch_running.clone();
         let retracting = Arc::new(AtomicBool::new(false));
         std::thread::spawn(move || {
-
             std::thread::sleep(std::time::Duration::from_millis(700));
             let mut seen_focused = false;
             let mut misses = 0u32;
@@ -1417,7 +1451,11 @@ pub fn run_capture_ui_with(
                     .ok()
                     .filter(|o| o.status.success())
                     .and_then(|o| serde_json::from_slice::<serde_json::Value>(&o.stdout).ok())
-                    .and_then(|v| v.get("title").and_then(|t| t.as_str()).map(|s| s.to_string()));
+                    .and_then(|v| {
+                        v.get("title")
+                            .and_then(|t| t.as_str())
+                            .map(|s| s.to_string())
+                    });
                 let is_voice = active_title.as_deref() == Some("Voice Capture");
                 if is_voice {
                     seen_focused = true;
@@ -1463,7 +1501,11 @@ pub fn run_capture_ui_with(
     VoiceView::new(&app).set_reveal(false);
     let t_show = std::time::Instant::now();
     ui_loader::show(&app).map_err(|e| e.to_string())?;
-    eprintln!("[voice][timing] show() in {:?} (total {:?})", t_show.elapsed(), t0.elapsed());
+    eprintln!(
+        "[voice][timing] show() in {:?} (total {:?})",
+        t_show.elapsed(),
+        t0.elapsed()
+    );
 
     let weak_reveal = app.as_weak();
     std::thread::spawn(move || {

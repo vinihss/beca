@@ -51,9 +51,8 @@ pub fn try_route_mod(target: &str, args: &[String]) -> Option<Value> {
 /// Opens a stream for `hyprland.subscribe` and returns the ack line.
 pub fn subscribe_stream() -> Result<UnixStream> {
     let path = socket_path();
-    let mut stream = UnixStream::connect(&path).with_context(|| {
-        format!("failed to connect to daemon at {}", path.display())
-    })?;
+    let mut stream = UnixStream::connect(&path)
+        .with_context(|| format!("failed to connect to daemon at {}", path.display()))?;
     writeln!(stream, "{}", json!(Request::HyprlandSubscribe))?;
     stream.flush()?;
     Ok(stream)

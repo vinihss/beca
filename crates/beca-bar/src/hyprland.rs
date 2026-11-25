@@ -22,12 +22,10 @@ pub fn hypr_dispatch_socket(cmd: &str) -> Option<String> {
 }
 
 pub fn hypr_eval(lua: &str) -> Option<String> {
-
     hypr_dispatch_socket(&format!("eval {lua}"))
 }
 
 pub fn set_monitor_reserved(monitor_name: &str, position: &str, height: i64, enable: bool) {
-
     let mut left = 0i64;
     let mut top = 0i64;
     let mut right = 0i64;
@@ -38,15 +36,15 @@ pub fn set_monitor_reserved(monitor_name: &str, position: &str, height: i64, ena
         .ok()
         .filter(|o| o.status.success())
         && let Ok(monitors) = serde_json::from_slice::<Vec<serde_json::Value>>(&out.stdout)
-            && let Some(m) = monitors
-                .iter()
-                .find(|m| m.get("name").and_then(|v| v.as_str()) == Some(monitor_name))
-                && let Some(rsv) = m.get("reserved").and_then(|v| v.as_array())
+        && let Some(m) = monitors
+            .iter()
+            .find(|m| m.get("name").and_then(|v| v.as_str()) == Some(monitor_name))
+        && let Some(rsv) = m.get("reserved").and_then(|v| v.as_array())
     {
-                left = rsv.first().and_then(|v| v.as_i64()).unwrap_or(0);
-                top = rsv.get(1).and_then(|v| v.as_i64()).unwrap_or(0);
-                right = rsv.get(2).and_then(|v| v.as_i64()).unwrap_or(0);
-                bottom = rsv.get(3).and_then(|v| v.as_i64()).unwrap_or(0);
+        left = rsv.first().and_then(|v| v.as_i64()).unwrap_or(0);
+        top = rsv.get(1).and_then(|v| v.as_i64()).unwrap_or(0);
+        right = rsv.get(2).and_then(|v| v.as_i64()).unwrap_or(0);
+        bottom = rsv.get(3).and_then(|v| v.as_i64()).unwrap_or(0);
     }
     if enable {
         match position {
@@ -119,7 +117,13 @@ pub fn dock_bar_hyprland(position: &str, height: f32, exclusive: bool) -> Option
     let mut addr: Option<String> = None;
     let mut mon_id: i64 = 0;
     for attempt in 0..60 {
-        let delay = if attempt < 10 { 20 } else if attempt < 25 { 40 } else { 80 };
+        let delay = if attempt < 10 {
+            20
+        } else if attempt < 25 {
+            40
+        } else {
+            80
+        };
         thread::sleep(Duration::from_millis(delay));
         let clients_out = Command::new("hyprctl")
             .args(["clients", "-j"])
@@ -146,7 +150,10 @@ pub fn dock_bar_hyprland(position: &str, height: f32, exclusive: bool) -> Option
                 }
             });
         if let Some(c) = client {
-            addr = c.get("address").and_then(|v| v.as_str()).map(|s| s.to_string());
+            addr = c
+                .get("address")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
             mon_id = c.get("monitor").and_then(|v| v.as_i64()).unwrap_or(0);
             if addr.is_some() {
                 break;
@@ -200,7 +207,11 @@ pub fn dock_bar_hyprland(position: &str, height: f32, exclusive: bool) -> Option
         .ok()
         .filter(|o| o.status.success())
         .and_then(|o| serde_json::from_slice::<serde_json::Value>(&o.stdout).ok())
-        .and_then(|v| v.get("address").and_then(|a| a.as_str()).map(|s| s.to_string()));
+        .and_then(|v| {
+            v.get("address")
+                .and_then(|a| a.as_str())
+                .map(|s| s.to_string())
+        });
 
     let focus = format!("dispatch hl.dsp.focus({{window = 'address:{addr}'}})");
     let move_cmd = format!("dispatch hl.dsp.window.move({{x={x},y={y}}})");
@@ -259,4 +270,3 @@ pub fn dock_bar_hyprland(position: &str, height: f32, exclusive: bool) -> Option
         Some(mon_name)
     }
 }
-

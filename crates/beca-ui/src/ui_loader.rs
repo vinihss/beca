@@ -50,13 +50,15 @@ thread_local! {
 }
 
 pub fn invalidate_cache() {
-    eprintln!("[beca-ui][debug] invalidate_cache() tid={:?}", std::thread::current().id());
+    eprintln!(
+        "[beca-ui][debug] invalidate_cache() tid={:?}",
+        std::thread::current().id()
+    );
     COMPILE_CACHE.with(|cache| cache.borrow_mut().clear());
     PRELOADED_DEF.with(|p| *p.borrow_mut() = None);
 }
 
 pub fn set_preloaded_component(name: &str, def: ComponentDefinition) {
-
     PRELOADED_DEF.with(|p| *p.borrow_mut() = Some((name.to_string(), 0, def)));
 }
 
@@ -65,7 +67,6 @@ pub fn clear_preloaded_component() {
 }
 
 fn ui_signature(dir: &Path) -> u64 {
-
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     let mut h = DefaultHasher::new();
@@ -107,7 +108,8 @@ pub fn ensure_defaults() -> Result<PathBuf, String> {
             };
             if should_write {
                 if let Some(parent) = path.parent() {
-                    fs::create_dir_all(parent).map_err(|e| format!("create ui dir {}: {e}", parent.display()))?;
+                    fs::create_dir_all(parent)
+                        .map_err(|e| format!("create ui dir {}: {e}", parent.display()))?;
                 }
                 fs::write(&path, content).map_err(|e| format!("write {}: {e}", path.display()))?;
                 changed = true;
@@ -118,7 +120,6 @@ pub fn ensure_defaults() -> Result<PathBuf, String> {
         }
         Ok(dir)
     } else {
-
         let dir = runtime_dir().join("beca").join("ui-embedded");
         fs::create_dir_all(&dir).map_err(|e| format!("create ui dir {}: {e}", dir.display()))?;
         let mut changed = false;
@@ -130,7 +131,8 @@ pub fn ensure_defaults() -> Result<PathBuf, String> {
             };
             if should_write {
                 if let Some(parent) = path.parent() {
-                    fs::create_dir_all(parent).map_err(|e| format!("create ui dir {}: {e}", parent.display()))?;
+                    fs::create_dir_all(parent)
+                        .map_err(|e| format!("create ui dir {}: {e}", parent.display()))?;
                 }
                 fs::write(&path, content).map_err(|e| format!("write {}: {e}", path.display()))?;
                 changed = true;
@@ -151,13 +153,14 @@ pub fn compile_component(name: &str) -> Result<ComponentDefinition, String> {
 
     let preloaded = PRELOADED_DEF.with(|p| {
         let b = p.borrow();
-        b.as_ref().and_then(|(n, _, def)| if n == name { Some(def.clone()) } else { None })
+        b.as_ref()
+            .and_then(|(n, _, def)| if n == name { Some(def.clone()) } else { None })
     });
     if let Some(def) = preloaded {
         eprintln!("[beca-ui][debug] using preloaded def: {name}");
         return Ok(def);
     } else {
-        let pinned = PRELOADED_DEF.with(|p| p.borrow().as_ref().map(|(n,_,_)| n.clone()));
+        let pinned = PRELOADED_DEF.with(|p| p.borrow().as_ref().map(|(n, _, _)| n.clone()));
         if let Some(pn) = pinned {
             eprintln!("[beca-ui][debug] preloaded mismatch: want={name} have={pn}");
         }
@@ -165,12 +168,19 @@ pub fn compile_component(name: &str) -> Result<ComponentDefinition, String> {
 
     let cached = COMPILE_CACHE.with(|cache| {
         let c = cache.borrow();
-        eprintln!("[beca-ui][debug] cache lookup {name}: entries={} tid={:?}", c.len(), std::thread::current().id());
+        eprintln!(
+            "[beca-ui][debug] cache lookup {name}: entries={} tid={:?}",
+            c.len(),
+            std::thread::current().id()
+        );
         c.get(name).and_then(|entry| {
             if entry.signature == sig {
                 Some(entry.def.clone())
             } else {
-                eprintln!("[beca-ui][debug] sig mismatch for {name}: have={} want={}", entry.signature, sig);
+                eprintln!(
+                    "[beca-ui][debug] sig mismatch for {name}: have={} want={}",
+                    entry.signature, sig
+                );
                 None
             }
         })
@@ -203,7 +213,10 @@ pub fn compile_component(name: &str) -> Result<ComponentDefinition, String> {
             cached_count += 1;
         }
     });
-    eprintln!("[beca-ui][debug] cached {cached_count} components (sig={sig}) tid={:?}", std::thread::current().id());
+    eprintln!(
+        "[beca-ui][debug] cached {cached_count} components (sig={sig}) tid={:?}",
+        std::thread::current().id()
+    );
 
     result
         .component(name)
@@ -331,9 +344,15 @@ mod tests {
             .unwrap_or_else(|e| panic!("AlertWindow failed to compile: {e}"));
         let callbacks: Vec<String> = def.callbacks().collect();
         let properties: Vec<String> = def.properties().map(|(n, _)| n).collect();
-        assert!(callbacks.iter().any(|c| c == "dismiss"), "missing dismiss callback");
+        assert!(
+            callbacks.iter().any(|c| c == "dismiss"),
+            "missing dismiss callback"
+        );
         for prop in ["title-text", "message-text", "timeout", "accent-color"] {
-            assert!(properties.iter().any(|n| n == prop), "missing property `{prop}`");
+            assert!(
+                properties.iter().any(|n| n == prop),
+                "missing property `{prop}`"
+            );
         }
     }
 

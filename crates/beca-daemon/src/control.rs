@@ -10,7 +10,9 @@ fn runtime_path(name: &str) -> PathBuf {
     if let Ok(dir) = std::env::var("XDG_RUNTIME_DIR") {
         PathBuf::from(dir).join("beca").join(name)
     } else {
-        beca_core::config::BecaPaths::resolve().config_dir.join(name)
+        beca_core::config::BecaPaths::resolve()
+            .config_dir
+            .join(name)
     }
 }
 
