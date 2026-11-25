@@ -222,26 +222,25 @@ pub fn show(position: &str) -> Result<()> {
                         "[beca-bar] layer-shell unavailable, falling back to window mode: {e}"
                     );
 
-                    if e.contains("dispatch:")
+                    if (e.contains("dispatch:")
                         || e.contains("roundtrip:")
                         || e.contains("flush:")
                         || e.contains("Backend error")
-                        || e.contains("Connection reset")
+                        || e.contains("Connection reset"))
+                        && let Ok(exe) = std::env::current_exe()
                     {
-                        if let Ok(exe) = std::env::current_exe() {
-                            let status = Command::new(exe)
-                                .env("BECA_NO_DAEMON", "1")
-                                .env("BECA_BAR_FORCE_WINDOW", "1")
-                                .args(["mod", "--local", &format!("bar:show-{}", position)])
-                                .status();
-                            match status {
-                                Ok(s) if s.success() => return Ok(()),
-                                Ok(s) => anyhow::bail!(
-                                    "bar window fallback process exited with status {s}"
-                                ),
-                                Err(err) => {
-                                    anyhow::bail!("failed to spawn bar window fallback: {err}")
-                                }
+                        let status = Command::new(exe)
+                            .env("BECA_NO_DAEMON", "1")
+                            .env("BECA_BAR_FORCE_WINDOW", "1")
+                            .args(["mod", "--local", &format!("bar:show-{}", position)])
+                            .status();
+                        match status {
+                            Ok(s) if s.success() => return Ok(()),
+                            Ok(s) => anyhow::bail!(
+                                "bar window fallback process exited with status {s}"
+                            ),
+                            Err(err) => {
+                                anyhow::bail!("failed to spawn bar window fallback: {err}")
                             }
                         }
                     }

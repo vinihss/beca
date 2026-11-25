@@ -43,5 +43,5 @@
 
 ## Gotchas
 - **`--hold` vs pipe**: pipe = stdout+exit (binds), no `--hold`. STT daemon `POST /transcribe` → `{ "text" }` (default `127.0.0.1:4100`, `VOICE_DAEMON_URL`).
-- **Slint**: only `Window` generates a Rust struct; non-`Window` exports are pruned from `library.slint` to avoid noise — components are resolved by name at runtime from the embedded bundle.
+- **Slint**: only `Window` generates a Rust struct; Rust bindings come from `ui/rust_bindings.slint` (Windows + `Theme`), while `library.slint` keeps the full export set for the runtime interpreter and the catalog — this avoids codegen warnings without changing runtime component resolution.
 - **Scripts:** Lua 5.4. Global `beca.*` namespace. `beca` loads `<mod>.lua` from `$XDG_CONFIG_HOME/beca/scripts/` with embedded fallback.

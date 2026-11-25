@@ -37,7 +37,6 @@ pub fn run_quick(
 
     {
         let base_url = base_url.to_string();
-        let respond = respond;
         std::thread::spawn(move || {
             let url = format!("{}/health", base_url.trim_end_matches('/'));
             let _ = ureq::get(&url).call();
@@ -288,16 +287,16 @@ pub fn run_quick(
             generation.fetch_add(1, Ordering::SeqCst);
             cancel_flag.store(true, Ordering::SeqCst);
             recording.store(false, Ordering::Relaxed);
-            if let Ok(mut o) = outcome.lock() {
-                if o.is_none() {
-                    *o = Some(Err("cancelled".to_string()));
-                }
+            if let Ok(mut o) = outcome.lock()
+                && o.is_none()
+            {
+                *o = Some(Err("cancelled".to_string()));
             }
-            if let Ok(mut slot) = active_child.lock() {
-                if let Some(mut c) = slot.take() {
-                    let _ = c.kill();
-                    let _ = c.wait();
-                }
+            if let Ok(mut slot) = active_child.lock()
+                && let Some(mut c) = slot.take()
+            {
+                let _ = c.kill();
+                let _ = c.wait();
             }
 
             if let Some(app) = weak.upgrade() {
@@ -438,11 +437,11 @@ pub fn run_quick(
     let _ = fs::remove_file(quick_ctl_path());
     generation.fetch_add(1, Ordering::SeqCst);
     cancel_flag.store(true, Ordering::SeqCst);
-    if let Ok(mut slot) = active_child.lock() {
-        if let Some(mut c) = slot.take() {
-            let _ = c.kill();
-            let _ = c.wait();
-        }
+    if let Ok(mut slot) = active_child.lock()
+        && let Some(mut c) = slot.take()
+    {
+        let _ = c.kill();
+        let _ = c.wait();
     }
     waveform_running.store(false, Ordering::Relaxed);
     recording.store(false, Ordering::Relaxed);

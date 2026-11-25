@@ -1,15 +1,16 @@
+use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc, Mutex, OnceLock,
+    Mutex, OnceLock,
 };
 
 use slint::platform::software_renderer::MinimalSoftwareWindow;
 use slint::platform::{EventLoopProxy, Platform, WindowAdapter};
 
-pub type PlatformQueue = Arc<Mutex<VecDeque<Rc<MinimalSoftwareWindow>>>>;
+pub type PlatformQueue = Rc<RefCell<VecDeque<Rc<MinimalSoftwareWindow>>>>;
 
 type EventLoopClosure = Box<dyn FnOnce() + Send>;
 
@@ -68,8 +69,7 @@ impl Platform for QueuedPlatform {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
         let win = self
             .queue
-            .lock()
-            .unwrap()
+            .borrow_mut()
             .pop_front()
             .ok_or_else(|| slint::PlatformError::Other("no window adapter queued".into()))?;
         Ok(win as Rc<dyn WindowAdapter>)
@@ -111,10 +111,11 @@ pub fn install_platform(queue: PlatformQueue) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
 
     #[test]
     fn event_loop_proxy_roundtrip() {
-        let queue: PlatformQueue = Arc::new(Mutex::new(VecDeque::new()));
+        let queue: PlatformQueue = Rc::new(RefCell::new(VecDeque::new()));
         install_platform(queue);
         reset_quit_flag();
         let _ = drain_pending_closures();

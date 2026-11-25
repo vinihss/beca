@@ -221,40 +221,40 @@ pub fn read_network() -> String {
     let out = Command::new("nmcli")
         .args(["-t", "-f", "TYPE,STATE,CONNECTION", "device"])
         .output();
-    if let Ok(o) = out {
-        if o.status.success() {
-            let s = String::from_utf8_lossy(&o.stdout);
-            for line in s.lines() {
-                let parts: Vec<&str> = line.split(':').collect();
-                if parts.len() >= 3 && parts[1] == "connected" {
-                    let name = parts[2];
-                    if !name.is_empty() && name != "--" {
-                        let short = if name.chars().count() > 12 {
-                            name.chars().take(12).collect::<String>() + "…"
-                        } else {
-                            name.to_string()
-                        };
-                        return short;
-                    }
+    if let Ok(o) = out
+        && o.status.success()
+    {
+        let s = String::from_utf8_lossy(&o.stdout);
+        for line in s.lines() {
+            let parts: Vec<&str> = line.split(':').collect();
+            if parts.len() >= 3 && parts[1] == "connected" {
+                let name = parts[2];
+                if !name.is_empty() && name != "--" {
+                    let short = if name.chars().count() > 12 {
+                        name.chars().take(12).collect::<String>() + "…"
+                    } else {
+                        name.to_string()
+                    };
+                    return short;
                 }
             }
-            for line in s.lines() {
-                let parts: Vec<&str> = line.split(':').collect();
-                if parts.len() >= 2 && parts[1] == "connected" {
-                    return "on".into();
-                }
+        }
+        for line in s.lines() {
+            let parts: Vec<&str> = line.split(':').collect();
+            if parts.len() >= 2 && parts[1] == "connected" {
+                return "on".into();
             }
         }
     }
     let out = Command::new("ip")
         .args(["-o", "link", "show", "up"])
         .output();
-    if let Ok(o) = out {
-        if o.status.success() {
-            let s = String::from_utf8_lossy(&o.stdout);
-            if s.lines().any(|l| !l.contains("lo:")) {
-                return "on".into();
-            }
+    if let Ok(o) = out
+        && o.status.success()
+    {
+        let s = String::from_utf8_lossy(&o.stdout);
+        if s.lines().any(|l| !l.contains("lo:")) {
+            return "on".into();
         }
     }
     "off".into()
@@ -262,25 +262,25 @@ pub fn read_network() -> String {
 
 pub fn read_bluetooth() -> String {
     let out = Command::new("bluetoothctl").args(["show"]).output();
-    if let Ok(o) = out {
-        if o.status.success() {
-            let s = String::from_utf8_lossy(&o.stdout);
-            let powered = s.lines().any(|l| l.trim() == "Powered: yes");
-            if !powered {
-                return "off".into();
-            }
-            if let Ok(dev) = Command::new("bluetoothctl")
-                .args(["devices", "Connected"])
-                .output()
-            {
-                let ds = String::from_utf8_lossy(&dev.stdout);
-                let count = ds.lines().filter(|l| !l.trim().is_empty()).count();
-                if count > 0 {
-                    return format!("{count}");
-                }
-            }
-            return "on".into();
+    if let Ok(o) = out
+        && o.status.success()
+    {
+        let s = String::from_utf8_lossy(&o.stdout);
+        let powered = s.lines().any(|l| l.trim() == "Powered: yes");
+        if !powered {
+            return "off".into();
         }
+        if let Ok(dev) = Command::new("bluetoothctl")
+            .args(["devices", "Connected"])
+            .output()
+        {
+            let ds = String::from_utf8_lossy(&dev.stdout);
+            let count = ds.lines().filter(|l| !l.trim().is_empty()).count();
+            if count > 0 {
+                return format!("{count}");
+            }
+        }
+        return "on".into();
     }
     "--".into()
 }
@@ -323,30 +323,29 @@ pub fn open_alerts_panel() {
 }
 
 pub fn read_alerts() -> String {
-    if let Ok(o) = Command::new("swaync-client").args(["-c"]).output() {
-        if o.status.success() {
-            let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-            if !s.is_empty() {
-                return s;
-            }
+    if let Ok(o) = Command::new("swaync-client").args(["-c"]).output()
+        && o.status.success()
+    {
+        let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+        if !s.is_empty() {
+            return s;
         }
     }
-    if let Ok(o) = Command::new("makoctl").arg("list").output() {
-        if o.status.success() {
-            let s = String::from_utf8_lossy(&o.stdout);
-            let count = s.matches("\n\n").count() + if s.trim().is_empty() { 0 } else { 1 };
-            return count.to_string();
-        }
+    if let Ok(o) = Command::new("makoctl").arg("list").output()
+        && o.status.success()
+    {
+        let s = String::from_utf8_lossy(&o.stdout);
+        let count = s.matches("\n\n").count() + if s.trim().is_empty() { 0 } else { 1 };
+        return count.to_string();
     }
     if let Ok(o) = Command::new("dunstctl")
         .args(["count", "displayed"])
         .output()
+        && o.status.success()
     {
-        if o.status.success() {
-            let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-            if !s.is_empty() {
-                return s;
-            }
+        let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+        if !s.is_empty() {
+            return s;
         }
     }
     "0".into()
@@ -421,15 +420,14 @@ pub fn read_memory() -> String {
 
 pub fn read_disk() -> String {
     let out = Command::new("df").args(["-h", "/"]).output();
-    if let Ok(o) = out {
-        if o.status.success() {
-            let s = String::from_utf8_lossy(&o.stdout);
-            if let Some(line) = s.lines().nth(1) {
-                if let Some(pct) = line.split_whitespace().nth(4) {
-                    return pct.to_string();
-                }
+    if let Ok(o) = out
+        && o.status.success()
+    {
+        let s = String::from_utf8_lossy(&o.stdout);
+        if let Some(line) = s.lines().nth(1)
+            && let Some(pct) = line.split_whitespace().nth(4) {
+                return pct.to_string();
             }
-        }
     }
     "--%".into()
 }

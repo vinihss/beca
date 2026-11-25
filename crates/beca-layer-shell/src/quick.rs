@@ -135,7 +135,7 @@ impl QuickState {
                 (width * height) as usize
             ];
             renderer.render(rgba.as_mut_slice(), width as usize);
-            for (dst, src) in canvas.chunks_exact_mut(4).zip(rgba.iter()) {
+            for (dst, src) in canvas.as_chunks_mut::<4>().0.iter_mut().zip(rgba.iter()) {
                 dst[0] = src.blue;
                 dst[1] = src.green;
                 dst[2] = src.red;
@@ -239,10 +239,10 @@ impl LayerShellHandler for QuickState {
         if let Some((width, height)) = dims {
             self.window.set_size(slint::PhysicalSize::new(width, height));
             let needed = (width as usize) * (height as usize) * 4;
-            if let Ok(new_pool) = SlotPool::new(needed.max(4096), &self.shm) {
-                if let Some(inst) = self.instance_for_layer_mut(layer) {
-                    inst.pool = new_pool;
-                }
+            if let Ok(new_pool) = SlotPool::new(needed.max(4096), &self.shm)
+                && let Some(inst) = self.instance_for_layer_mut(layer)
+            {
+                inst.pool = new_pool;
             }
             self.window.request_redraw();
         }

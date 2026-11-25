@@ -37,20 +37,16 @@ pub fn set_monitor_reserved(monitor_name: &str, position: &str, height: i64, ena
         .output()
         .ok()
         .filter(|o| o.status.success())
-    {
-        if let Ok(monitors) = serde_json::from_slice::<Vec<serde_json::Value>>(&out.stdout) {
-            if let Some(m) = monitors
+        && let Ok(monitors) = serde_json::from_slice::<Vec<serde_json::Value>>(&out.stdout)
+            && let Some(m) = monitors
                 .iter()
                 .find(|m| m.get("name").and_then(|v| v.as_str()) == Some(monitor_name))
-            {
-                if let Some(rsv) = m.get("reserved").and_then(|v| v.as_array()) {
-                    left = rsv.get(0).and_then(|v| v.as_i64()).unwrap_or(0);
-                    top = rsv.get(1).and_then(|v| v.as_i64()).unwrap_or(0);
-                    right = rsv.get(2).and_then(|v| v.as_i64()).unwrap_or(0);
-                    bottom = rsv.get(3).and_then(|v| v.as_i64()).unwrap_or(0);
-                }
-            }
-        }
+                && let Some(rsv) = m.get("reserved").and_then(|v| v.as_array())
+    {
+                left = rsv.first().and_then(|v| v.as_i64()).unwrap_or(0);
+                top = rsv.get(1).and_then(|v| v.as_i64()).unwrap_or(0);
+                right = rsv.get(2).and_then(|v| v.as_i64()).unwrap_or(0);
+                bottom = rsv.get(3).and_then(|v| v.as_i64()).unwrap_or(0);
     }
     if enable {
         match position {
@@ -89,7 +85,7 @@ pub fn clear_reserved_for_position(position: &str) {
 
         let reserved = m.get("reserved").and_then(|v| v.as_array());
         let l = reserved
-            .and_then(|a| a.get(0))
+            .and_then(|a| a.first())
             .and_then(|v| v.as_i64())
             .unwrap_or(0);
         let t = reserved

@@ -327,10 +327,10 @@ fn run_shell_stdout(
     }
     loop {
         if cancel.load(Ordering::Relaxed) {
-            if let Ok(mut slot) = active_child.lock() {
-                if let Some(mut c) = slot.take() {
-                    kill_child_process(&mut c);
-                }
+            if let Ok(mut slot) = active_child.lock()
+                && let Some(mut c) = slot.take()
+            {
+                kill_child_process(&mut c);
             }
             return Err("cancelled".to_string());
         }
@@ -400,10 +400,10 @@ fn run_shell_status(
     }
     loop {
         if cancel.load(Ordering::Relaxed) {
-            if let Ok(mut slot) = active_child.lock() {
-                if let Some(mut c) = slot.take() {
-                    kill_child_process(&mut c);
-                }
+            if let Ok(mut slot) = active_child.lock()
+                && let Some(mut c) = slot.take()
+            {
+                kill_child_process(&mut c);
             }
             return Err("cancelled".to_string());
         }
@@ -840,7 +840,6 @@ pub fn run_capture_ui_with(
 
     {
         let base_url = base_url.to_string();
-        let respond = respond;
         std::thread::spawn(move || {
 
             let url = format!("{}/health", base_url.trim_end_matches('/'));
@@ -854,7 +853,6 @@ pub fn run_capture_ui_with(
             }
         });
     }
-    let out_path = out_path;
     let t0 = std::time::Instant::now();
     let t_step = std::time::Instant::now();
     let behavior = Behavior::load_with(ui_texts);
@@ -1236,11 +1234,11 @@ pub fn run_capture_ui_with(
             let _ = stream_ctl.pause();
             finishing.store(false, Ordering::SeqCst);
 
-            if let Ok(mut slot) = active_child.lock() {
-                if let Some(mut c) = slot.take() {
-                    let _ = c.kill();
-                    let _ = c.wait();
-                }
+            if let Ok(mut slot) = active_child.lock()
+                && let Some(mut c) = slot.take()
+            {
+                let _ = c.kill();
+                let _ = c.wait();
             }
 
             if let Ok(mut r) = recent_for_stop.lock() {
@@ -1290,16 +1288,16 @@ pub fn run_capture_ui_with(
             recording.store(false, Ordering::Relaxed);
             let _ = stream_ctl.pause();
             finishing.store(false, Ordering::SeqCst);
-            if let Ok(mut slot) = active_child.lock() {
-                if let Some(mut c) = slot.take() {
-                    let _ = c.kill();
-                    let _ = c.wait();
-                }
+            if let Ok(mut slot) = active_child.lock()
+                && let Some(mut c) = slot.take()
+            {
+                let _ = c.kill();
+                let _ = c.wait();
             }
-            if let Ok(mut o) = outcome.lock() {
-                if o.is_none() {
-                    *o = Some(CaptureOutcome::Cancel);
-                }
+            if let Ok(mut o) = outcome.lock()
+                && o.is_none()
+            {
+                *o = Some(CaptureOutcome::Cancel);
             }
             if let Some(app) = weak.upgrade() {
                 let _ = app.hide();
@@ -1435,16 +1433,16 @@ pub fn run_capture_ui_with(
                     cancel_flag.store(true, Ordering::SeqCst);
                     recording.store(false, Ordering::Relaxed);
                     finishing.store(false, Ordering::SeqCst);
-                    if let Ok(mut slot) = active_child.lock() {
-                        if let Some(mut c) = slot.take() {
-                            let _ = c.kill();
-                            let _ = c.wait();
-                        }
+                    if let Ok(mut slot) = active_child.lock()
+                        && let Some(mut c) = slot.take()
+                    {
+                        let _ = c.kill();
+                        let _ = c.wait();
                     }
-                    if let Ok(mut o) = outcome.lock() {
-                        if o.is_none() {
-                            *o = Some(CaptureOutcome::Cancel);
-                        }
+                    if let Ok(mut o) = outcome.lock()
+                        && o.is_none()
+                    {
+                        *o = Some(CaptureOutcome::Cancel);
                     }
                     let weak2 = weak.clone();
                     let _ = slint_interpreter::invoke_from_event_loop(move || {
@@ -1482,11 +1480,11 @@ pub fn run_capture_ui_with(
     cancel_flag.store(true, Ordering::SeqCst);
     focus_watch_running.store(false, Ordering::Relaxed);
     position_running.store(false, Ordering::Relaxed);
-    if let Ok(mut slot) = active_child.lock() {
-        if let Some(mut c) = slot.take() {
-            let _ = c.kill();
-            let _ = c.wait();
-        }
+    if let Ok(mut slot) = active_child.lock()
+        && let Some(mut c) = slot.take()
+    {
+        let _ = c.kill();
+        let _ = c.wait();
     }
     waveform_running.store(false, Ordering::Relaxed);
     recording.store(false, Ordering::Relaxed);

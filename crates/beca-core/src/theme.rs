@@ -5,21 +5,13 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct Theme {
     pub meta: ThemeMeta,
     pub colors: ThemeColors,
     pub metrics: ThemeMetrics,
 }
 
-impl Default for Theme {
-    fn default() -> Self {
-        Self {
-            meta: ThemeMeta::default(),
-            colors: ThemeColors::default(),
-            metrics: ThemeMetrics::default(),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]

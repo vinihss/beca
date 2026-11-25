@@ -1,6 +1,6 @@
+use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use beca_core::BarProperties;
@@ -64,7 +64,7 @@ pub fn run_bar(
         LayerShell::bind(&globals, &qh).map_err(|e| format!("wlr-layer-shell unavailable: {e}"))?;
     let shm = Shm::bind(&globals, &qh).map_err(|e| format!("wl_shm: {e}"))?;
 
-    let queue: PlatformQueue = Arc::new(Mutex::new(VecDeque::new()));
+    let queue: PlatformQueue = Rc::new(RefCell::new(VecDeque::new()));
 
     install_platform(queue.clone());
 
@@ -176,7 +176,7 @@ impl BarState {
         qh: &QueueHandle<Self>,
     ) -> Result<(), String> {
         let msw = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
-        self.queue.lock().unwrap().push_back(msw.clone());
+        self.queue.borrow_mut().push_back(msw.clone());
 
         let bar = BarWindow::new().map_err(|e| format!("BarWindow: {e}"))?;
         apply_theme(&bar, &self.theme);
@@ -274,7 +274,7 @@ fn draw_instance_if_needed(inst: &mut BarInstance, qh: &QueueHandle<BarState>) -
             (width * height) as usize
         ];
         renderer.render(rgba.as_mut_slice(), width as usize);
-        for (dst, src) in canvas.chunks_exact_mut(4).zip(rgba.iter()) {
+        for (dst, src) in canvas.as_chunks_mut::<4>().0.iter_mut().zip(rgba.iter()) {
             dst[0] = src.blue;
             dst[1] = src.green;
             dst[2] = src.red;
@@ -395,10 +395,8 @@ impl SeatHandler for BarState {
         _: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Pointer {
-            if let Some(pointer) = self.pointer.take() {
-                pointer.release();
-            }
+        if capability == Capability::Pointer && let Some(pointer) = self.pointer.take() {
+            pointer.release();
         }
     }
     fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}

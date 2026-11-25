@@ -15,10 +15,10 @@ fn main() -> Result<(), slint::PlatformError> {
     {
         let panel = panel.clone();
         ui.on_open_panel(move || {
-            if let Some(existing) = panel.borrow().as_ref() {
-                if existing.show().is_ok() {
-                    return;
-                }
+            if let Some(existing) = panel.borrow().as_ref()
+                && existing.show().is_ok()
+            {
+                return;
             }
 
             match beca_ui::AppWindow::new() {

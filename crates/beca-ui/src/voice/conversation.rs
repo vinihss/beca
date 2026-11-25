@@ -288,7 +288,6 @@ fn process_utterance(
         Err(e) => {
             eprintln!("[beca-converse] respond failed: {e}");
             set_status(weak, "Error: response failed", "#f7768e");
-            return;
         }
     }
 }
@@ -351,7 +350,6 @@ pub fn run_conversation(
         let stop = stop_flag.clone();
         let base_url = base_url.to_string();
         let respond_cfg = respond_cfg.clone();
-        let sample_rate = sample_rate;
         thread::spawn(move || {
             let mut vad = VadEngine::new(sample_rate);
             let mut last_level_ui = Instant::now() - Duration::from_millis(200);

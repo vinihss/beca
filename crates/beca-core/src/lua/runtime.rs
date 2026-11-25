@@ -23,28 +23,28 @@ pub fn call_hook(lua: &Lua, name: &str) {
     let Ok(beca) = lua.globals().get::<Table>("beca") else {
         return;
     };
-    if let Ok(hooks) = beca.get::<Table>("hooks") {
-        if let Ok(f) = hooks.get::<Function>(name) {
-            if let Err(e) = f.call::<()>(()) {
-                eprintln!("[beca] hook '{name}' failed: {e}");
-            }
-            return;
-        }
-    }
-    if let Ok(f) = beca.get::<Function>(name) {
+    if let Ok(hooks) = beca.get::<Table>("hooks")
+        && let Ok(f) = hooks.get::<Function>(name)
+    {
         if let Err(e) = f.call::<()>(()) {
             eprintln!("[beca] hook '{name}' failed: {e}");
         }
+        return;
+    }
+    if let Ok(f) = beca.get::<Function>(name)
+        && let Err(e) = f.call::<()>(())
+    {
+        eprintln!("[beca] hook '{name}' failed: {e}");
     }
 }
 
 pub fn exec_module_script(lua: &Lua, name: &str, embedded: &str) -> Result<()> {
 
-    if let Ok(beca) = lua.globals().get::<Table>("beca") {
-        if let Ok(runtime) = beca.get::<Table>("runtime") {
-            let _ = runtime.set("_module", name);
-            let _ = runtime.set("_embedded", embedded);
-        }
+    if let Ok(beca) = lua.globals().get::<Table>("beca")
+        && let Ok(runtime) = beca.get::<Table>("runtime")
+    {
+        let _ = runtime.set("_module", name);
+        let _ = runtime.set("_embedded", embedded);
     }
     let code = load_module_script(name, embedded);
     lua.load(&code)

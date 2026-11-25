@@ -42,17 +42,17 @@ pub fn run_script(script: &str, args: &[String]) -> Result<()> {
         .set("arg", arg_tbl)
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
-    if let Ok(beca) = lua.globals().get::<mlua::Table>("beca") {
-        if let Ok(rt) = beca.get::<mlua::Table>("runtime") {
-            let name = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or(script)
-                .to_string();
-            let _ = rt.set("_module", name);
-            let _ = rt.set("_embedded", code.as_str());
-            let _ = rt.set("_script_path", script);
-        }
+    if let Ok(beca) = lua.globals().get::<mlua::Table>("beca")
+        && let Ok(rt) = beca.get::<mlua::Table>("runtime")
+    {
+        let name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(script)
+            .to_string();
+        let _ = rt.set("_module", name);
+        let _ = rt.set("_embedded", code.as_str());
+        let _ = rt.set("_script_path", script);
     }
 
     lua.load(&code)

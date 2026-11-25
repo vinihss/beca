@@ -102,9 +102,7 @@ pub fn handle(target: &str, args: &[String]) -> Option<Value> {
 
     let position = position_for_target(target, args);
     if target.contains("hide") || target.contains("stop") {
-        let Some(position) = position else {
-            return None;
-        };
+        let position = position?;
         let mut st = state().lock().unwrap();
         if let Some(pid) = st.bars.remove(&position) {
             if is_pid_alive(pid) {
@@ -125,9 +123,7 @@ pub fn handle(target: &str, args: &[String]) -> Option<Value> {
     }
 
     if target.contains("show") {
-        let Some(position) = position else {
-            return None;
-        };
+        let position = position?;
         let mut st = state().lock().unwrap();
         if let Some(pid) = st.bars.get(&position).copied() {
             if is_pid_alive(pid) {

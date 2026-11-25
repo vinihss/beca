@@ -81,10 +81,8 @@ fn install_system(lua: &Lua, beca: &Table) -> mlua::Result<()> {
         lua.create_function(|lua, (cmd, args): (String, Option<Table>)| {
             let mut command = Command::new(&cmd);
             if let Some(args) = args {
-                for v in args.sequence_values::<String>() {
-                    if let Ok(s) = v {
-                        command.arg(s);
-                    }
+                for s in args.sequence_values::<String>().flatten() {
+                    command.arg(s);
                 }
             }
             match command.output() {
@@ -223,12 +221,10 @@ fn install_events(lua: &Lua, beca: &Table) -> mlua::Result<()> {
             let handlers: Table = events.get("_handlers")?;
             if let Ok(list) = handlers.get::<Table>(name.as_str()) {
                 let mut kept = Vec::new();
-                for pair in list.sequence_values::<Table>() {
-                    if let Ok(entry) = pair {
-                        let eid: i64 = entry.get("id").unwrap_or(-1);
-                        if eid != id {
-                            kept.push(entry);
-                        }
+                for entry in list.sequence_values::<Table>().flatten() {
+                    let eid: i64 = entry.get("id").unwrap_or(-1);
+                    if eid != id {
+                        kept.push(entry);
                     }
                 }
                 let new_list = lua.create_table()?;
@@ -248,11 +244,11 @@ fn install_events(lua: &Lua, beca: &Table) -> mlua::Result<()> {
             let handlers: Table = events.get("_handlers")?;
             if let Ok(list) = handlers.get::<Table>(name.as_str()) {
                 for pair in list.sequence_values::<Table>() {
-                    if let Ok(entry) = pair {
-                        if let Ok(func) = entry.get::<Function>("fn") {
-                            let p = payload.clone().unwrap_or(Value::Nil);
-                            let _ = func.call::<()>(p);
-                        }
+                    if let Ok(entry) = pair
+                        && let Ok(func) = entry.get::<Function>("fn")
+                    {
+                        let p = payload.clone().unwrap_or(Value::Nil);
+                        let _ = func.call::<()>(p);
                     }
                 }
             }

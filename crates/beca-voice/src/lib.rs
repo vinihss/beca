@@ -10,7 +10,7 @@ fn run_voice_layer_shell_show(action: &str, args: &[String]) -> Result<()> {
     #[cfg(target_os = "linux")]
     if !force_window && std::env::var_os("WAYLAND_DISPLAY").is_some() {
         use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
-        use std::{collections::VecDeque, rc::Rc, sync::Mutex};
+        use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
         if std::env::var_os("BECA_VOICE_COMPONENT").is_none() {
             let name = if action.starts_with("assistant") {
@@ -21,10 +21,10 @@ fn run_voice_layer_shell_show(action: &str, args: &[String]) -> Result<()> {
             unsafe { std::env::set_var("BECA_VOICE_COMPONENT", name) };
         }
 
-        let queue = Arc::new(Mutex::new(VecDeque::<Rc<MinimalSoftwareWindow>>::new()));
+        let queue = Rc::new(RefCell::new(VecDeque::<Rc<MinimalSoftwareWindow>>::new()));
         beca_layer_shell::install_platform(queue.clone());
         let msw = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
-        queue.lock().unwrap().push_back(msw.clone());
+        queue.borrow_mut().push_back(msw.clone());
 
         beca_ui::ui_loader::set_custom_event_loop(move || {
             beca_layer_shell::run_voice_layer_shell(msw.clone())
@@ -216,12 +216,12 @@ fn run_voice_quick(args: &[String]) -> Result<()> {
     #[cfg(target_os = "linux")]
     if !force_window && std::env::var_os("WAYLAND_DISPLAY").is_some() {
         use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
-        use std::{collections::VecDeque, rc::Rc, sync::Mutex};
+        use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
-        let queue = Arc::new(Mutex::new(VecDeque::<Rc<MinimalSoftwareWindow>>::new()));
+        let queue = Rc::new(RefCell::new(VecDeque::<Rc<MinimalSoftwareWindow>>::new()));
         beca_layer_shell::install_platform(queue.clone());
         let msw = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
-        queue.lock().unwrap().push_back(msw.clone());
+        queue.borrow_mut().push_back(msw.clone());
 
         beca_ui::ui_loader::set_custom_event_loop(move || {
             beca_layer_shell::run_quick_layer_shell(msw.clone())
@@ -291,12 +291,12 @@ fn run_voice_converse(args: &[String]) -> Result<()> {
     #[cfg(target_os = "linux")]
     if !force_window && std::env::var_os("WAYLAND_DISPLAY").is_some() {
         use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
-        use std::{collections::VecDeque, rc::Rc, sync::Mutex};
+        use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
-        let queue = Arc::new(Mutex::new(VecDeque::<Rc<MinimalSoftwareWindow>>::new()));
+        let queue = Rc::new(RefCell::new(VecDeque::<Rc<MinimalSoftwareWindow>>::new()));
         beca_layer_shell::install_platform(queue.clone());
         let msw = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
-        queue.lock().unwrap().push_back(msw.clone());
+        queue.borrow_mut().push_back(msw.clone());
 
         beca_ui::ui_loader::set_custom_event_loop(move || {
             beca_layer_shell::run_orb_layer_shell(msw.clone())

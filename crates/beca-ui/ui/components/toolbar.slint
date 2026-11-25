@@ -56,13 +56,16 @@ export component M3TopAppBar inherits Rectangle {
             }
         }
 
-        if root.bar-type == M3TopAppBarType.medium || root.bar-type == M3TopAppBarType.large : Text {
-            text: root.title;
-            color: Theme.m3-on-surface;
-            font-size: root.bar-type == M3TopAppBarType.large ? 28px : 24px;
-            vertical-alignment: bottom;
-            padding-left: 16px; padding-bottom: 8px;
+        if root.bar-type == M3TopAppBarType.medium || root.bar-type == M3TopAppBarType.large : HorizontalLayout {
+            padding-left: 16px;
+            padding-bottom: 8px;
             vertical-stretch: 1;
+            Text {
+                text: root.title;
+                color: Theme.m3-on-surface;
+                font-size: root.bar-type == M3TopAppBarType.large ? 28px : 24px;
+                vertical-alignment: bottom;
+            }
         }
     }
 }

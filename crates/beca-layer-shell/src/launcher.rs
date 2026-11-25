@@ -156,7 +156,7 @@ impl LauncherState {
                 (width * height) as usize
             ];
             renderer.render(rgba.as_mut_slice(), width as usize);
-            for (dst, src) in canvas.chunks_exact_mut(4).zip(rgba.iter()) {
+            for (dst, src) in canvas.as_chunks_mut::<4>().0.iter_mut().zip(rgba.iter()) {
                 dst[0] = src.blue;
                 dst[1] = src.green;
                 dst[2] = src.red;
@@ -302,10 +302,10 @@ impl LayerShellHandler for LauncherState {
         if let Some((width, height)) = dims {
             self.window.set_size(PhysicalSize::new(width, height));
             let needed = (width as usize) * (height as usize) * 4;
-            if let Ok(new_pool) = SlotPool::new(needed.max(4096), &self.shm) {
-                if let Some(inst) = self.instance_for_layer_mut(layer) {
-                    inst.pool = new_pool;
-                }
+            if let Ok(new_pool) = SlotPool::new(needed.max(4096), &self.shm)
+                && let Some(inst) = self.instance_for_layer_mut(layer)
+            {
+                inst.pool = new_pool;
             }
             self.window.request_redraw();
         }
@@ -324,15 +324,15 @@ impl SeatHandler for LauncherState {
         seat: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Pointer && self.pointer.is_none() {
-            if let Ok(pointer) = self.seat_state.get_pointer(qh, &seat) {
-                self.pointer = Some(pointer);
-            }
+        if capability == Capability::Pointer && self.pointer.is_none()
+            && let Ok(pointer) = self.seat_state.get_pointer(qh, &seat)
+        {
+            self.pointer = Some(pointer);
         }
-        if capability == Capability::Keyboard && self.keyboard.is_none() {
-            if let Ok(kb) = self.seat_state.get_keyboard(qh, &seat, None) {
-                self.keyboard = Some(kb);
-            }
+        if capability == Capability::Keyboard && self.keyboard.is_none()
+            && let Ok(kb) = self.seat_state.get_keyboard(qh, &seat, None)
+        {
+            self.keyboard = Some(kb);
         }
     }
     fn remove_capability(
@@ -342,15 +342,11 @@ impl SeatHandler for LauncherState {
         _: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Pointer {
-            if let Some(pointer) = self.pointer.take() {
-                pointer.release();
-            }
+        if capability == Capability::Pointer && let Some(pointer) = self.pointer.take() {
+            pointer.release();
         }
-        if capability == Capability::Keyboard {
-            if let Some(kb) = self.keyboard.take() {
-                kb.release();
-            }
+        if capability == Capability::Keyboard && let Some(kb) = self.keyboard.take() {
+            kb.release();
         }
     }
     fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
@@ -590,10 +586,8 @@ fn keysym_to_slint_text(event: &KeyEvent) -> Option<SharedString> {
         return special;
     }
 
-    if let Some(ref utf8) = event.utf8 {
-        if !utf8.is_empty() {
-            return Some(SharedString::from(utf8.as_str()));
-        }
+    if let Some(ref utf8) = event.utf8 && !utf8.is_empty() {
+        return Some(SharedString::from(utf8.as_str()));
     }
     event.keysym.key_char().map(|c| SharedString::from(c.to_string().as_str()))
 }

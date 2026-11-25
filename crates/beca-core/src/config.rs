@@ -84,6 +84,7 @@ pub fn ensure_defaults_with_paths(paths: &BecaPaths, force: bool) -> Result<Vec<
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct Config {
     pub core: CoreConfig,
     pub shell: ShellConfig,
@@ -92,17 +93,6 @@ pub struct Config {
     pub widget: WidgetsConfig,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            core: CoreConfig::default(),
-            shell: ShellConfig::default(),
-            modules: ModulesConfig::default(),
-            bar: BarsConfig::default(),
-            widget: WidgetsConfig::default(),
-        }
-    }
-}
 
 impl Config {
     pub fn bar_config_for(&self, position: &str) -> BarModuleConfig {
@@ -132,17 +122,11 @@ pub struct ShellConfig {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct ModulesConfig {
     pub voice: VoiceModuleConfig,
 }
 
-impl Default for ModulesConfig {
-    fn default() -> Self {
-        Self {
-            voice: VoiceModuleConfig::default(),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -258,19 +242,12 @@ impl BarModuleConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct WidgetsConfig {
     pub clock: ClockWidgetConfig,
     pub launcher: LauncherWidgetConfig,
 }
 
-impl Default for WidgetsConfig {
-    fn default() -> Self {
-        Self {
-            clock: ClockWidgetConfig::default(),
-            launcher: LauncherWidgetConfig::default(),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -302,16 +279,13 @@ impl Default for LauncherWidgetConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum VoiceMode {
+    #[default]
     Pipe,
     Hold,
 }
 
-impl Default for VoiceMode {
-    fn default() -> Self {
-        VoiceMode::Pipe
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -403,20 +377,20 @@ pub fn load_config_from(path: &Path) -> (Config, Option<PathBuf>) {
 }
 
 pub fn apply_env(cfg: &mut Config) {
-    if let Ok(v) = std::env::var("VOICE_DAEMON_URL") {
-        if !v.is_empty() {
-            cfg.modules.voice.daemon_url = v;
-        }
+    if let Ok(v) = std::env::var("VOICE_DAEMON_URL")
+        && !v.is_empty()
+    {
+        cfg.modules.voice.daemon_url = v;
     }
-    if let Ok(v) = std::env::var("BECA_THEME") {
-        if !v.is_empty() {
-            cfg.core.theme = v;
-        }
+    if let Ok(v) = std::env::var("BECA_THEME")
+        && !v.is_empty()
+    {
+        cfg.core.theme = v;
     }
-    if let Ok(v) = std::env::var("BECA_LOG_LEVEL") {
-        if !v.is_empty() {
-            cfg.core.log_level = v;
-        }
+    if let Ok(v) = std::env::var("BECA_LOG_LEVEL")
+        && !v.is_empty()
+    {
+        cfg.core.log_level = v;
     }
 }
 

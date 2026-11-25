@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 fn main() {
     generate_embedded_ui_bundle();
-    slint_build::compile("ui/library.slint").expect("Slint build failed");
+    slint_build::compile("ui/rust_bindings.slint").expect("Slint build failed");
 }
 
 fn collect_slint_files(dir: &Path, base: &Path, out: &mut Vec<PathBuf>) {

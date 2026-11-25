@@ -1,7 +1,7 @@
 use slint_interpreter::{Compiler, ComponentDefinition, ComponentHandle, ComponentInstance, Value};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 pub fn ui_dir() -> PathBuf {
@@ -27,7 +27,7 @@ fn runtime_dir() -> PathBuf {
     std::env::var_os("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
         .or_else(|| dirs_path_home().map(|h| h.join(".cache")))
-        .unwrap_or_else(|| std::env::temp_dir())
+        .unwrap_or_else(std::env::temp_dir)
 }
 
 include!(concat!(env!("OUT_DIR"), "/ui_bundle.rs"));
@@ -46,7 +46,7 @@ thread_local! {
     static COMPILE_CACHE: std::cell::RefCell<HashMap<String, CachedDef>> =
         std::cell::RefCell::new(HashMap::new());
     static PRELOADED_DEF: std::cell::RefCell<Option<(String, u64, ComponentDefinition)>> =
-        std::cell::RefCell::new(None);
+        const { std::cell::RefCell::new(None) };
 }
 
 pub fn invalidate_cache() {
@@ -64,7 +64,7 @@ pub fn clear_preloaded_component() {
     PRELOADED_DEF.with(|p| *p.borrow_mut() = None);
 }
 
-fn ui_signature(dir: &PathBuf) -> u64 {
+fn ui_signature(dir: &Path) -> u64 {
 
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
@@ -75,11 +75,11 @@ fn ui_signature(dir: &PathBuf) -> u64 {
         match fs::metadata(&path) {
             Ok(m) => {
                 m.len().hash(&mut h);
-                if let Ok(t) = m.modified() {
-                    if let Ok(d) = t.duration_since(SystemTime::UNIX_EPOCH) {
-                        d.as_secs().hash(&mut h);
-                        d.subsec_nanos().hash(&mut h);
-                    }
+                if let Ok(t) = m.modified()
+                    && let Ok(d) = t.duration_since(SystemTime::UNIX_EPOCH)
+                {
+                    d.as_secs().hash(&mut h);
+                    d.subsec_nanos().hash(&mut h);
                 }
             }
             Err(_) => {
@@ -248,9 +248,11 @@ pub fn show(instance: &ComponentInstance) -> Result<(), String> {
 pub fn hide(instance: &ComponentInstance) -> Result<(), String> {
     instance.hide().map_err(|e| format!("hide: {e}"))
 }
+type CustomEventLoop = Box<dyn FnOnce() -> Result<(), String>>;
+
 thread_local! {
 
-    static CUSTOM_EVENT_LOOP: std::cell::RefCell<Option<Box<dyn FnOnce() -> Result<(), String>>>> =
+    static CUSTOM_EVENT_LOOP: std::cell::RefCell<Option<CustomEventLoop>> =
         const { std::cell::RefCell::new(None) };
 }
 
@@ -316,12 +318,11 @@ mod tests {
         let def = super::compile_component("ConversationOrb")
             .unwrap_or_else(|e| panic!("ConversationOrb failed to compile: {e}"));
         let available: Vec<String> = def.callbacks().collect();
-        for cb in ["quit-orb"] {
-            assert!(
-                available.iter().any(|c| c == cb),
-                "ConversationOrb is missing callback `{cb}` (known: {available:?})"
-            );
-        }
+        let cb = "quit-orb";
+        assert!(
+            available.iter().any(|c| c == cb),
+            "ConversationOrb is missing callback `{cb}` (known: {available:?})"
+        );
     }
 
     #[test]

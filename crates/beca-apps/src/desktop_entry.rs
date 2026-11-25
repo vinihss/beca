@@ -76,10 +76,10 @@ pub fn resolve_icon(icon: &str) -> Option<String> {
     if icon.is_empty() {
         return None;
     }
-    if let Ok(cache) = icon_cache().lock() {
-        if let Some(hit) = cache.get(icon) {
-            return hit.clone();
-        }
+    if let Ok(cache) = icon_cache().lock()
+        && let Some(hit) = cache.get(icon)
+    {
+        return hit.clone();
     }
     let resolved = resolve_icon_uncached(icon);
     if let Ok(mut cache) = icon_cache().lock() {
@@ -181,14 +181,12 @@ fn find_icon_shallow(root: &Path, name: &str, depth: usize) -> Option<String> {
             if let Some(found) = find_icon_shallow(&path, name, depth - 1) {
                 return Some(found);
             }
-        } else if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-            if stem == name {
-                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                    if matches!(ext, "png" | "svg" | "xpm") {
-                        return Some(path.to_string_lossy().to_string());
-                    }
-                }
-            }
+        } else if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+            && stem == name
+            && let Some(ext) = path.extension().and_then(|e| e.to_str())
+            && matches!(ext, "png" | "svg" | "xpm")
+        {
+            return Some(path.to_string_lossy().to_string());
         }
     }
     None

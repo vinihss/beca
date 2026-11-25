@@ -155,9 +155,11 @@ mod tests {
 
     #[test]
     fn invalid_colors_fall_back_to_defaults() {
-        let mut t = crate::voice::VoiceTheme::default();
-        t.accent = "garbage".into();
-        t.radius = 12.0;
+        let t = crate::voice::VoiceTheme {
+            accent: "garbage".into(),
+            radius: 12.0,
+            ..Default::default()
+        };
         let tokens = ThemeTokens::from_voice_theme(&t);
         assert_eq!(tokens.accent, ThemeTokens::default().accent);
         assert_eq!(tokens.radius, 12.0);

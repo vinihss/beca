@@ -186,10 +186,10 @@ fn read_sse(
         }
         match event.get("type").and_then(|t| t.as_str()) {
             Some("delta") => {
-                if let Some(content) = event.get("content").and_then(|c| c.as_str()) {
-                    if !content.is_empty() {
-                        on_delta(content);
-                    }
+                if let Some(content) = event.get("content").and_then(|c| c.as_str())
+                    && !content.is_empty()
+                {
+                    on_delta(content);
                 }
             }
             Some("finished") => break,
@@ -278,7 +278,7 @@ fn pt_rest(n: u64) -> String {
     if rest == 0 {
         return head;
     }
-    let sep = if rest < 100 || rest % 100 == 0 { " e " } else { " " };
+    let sep = if rest < 100 || rest.is_multiple_of(100) { " e " } else { " " };
     format!("{head}{sep}{}", pt_under_1000(rest))
 }
 
@@ -299,7 +299,7 @@ fn pt_int_words(n: u64) -> String {
     if rest == 0 {
         return head;
     }
-    let sep = if rest < 100 || rest % 100 == 0 { " e " } else { " " };
+    let sep = if rest < 100 || rest.is_multiple_of(100) { " e " } else { " " };
     format!("{head}{sep}{}", pt_rest(rest))
 }
 
@@ -369,7 +369,7 @@ fn wordify_numbers(text: &str) -> String {
                 let d2 = chars.get(i + 2).is_some_and(|d| d.is_ascii_digit());
                 let d3 = chars.get(i + 3).is_some_and(|d| d.is_ascii_digit());
                 let d4 = chars.get(i + 4).is_some_and(|d| d.is_ascii_digit());
-                let boundary = chars.get(i + 4).map_or(true, |d| !d.is_ascii_digit());
+                let boundary = chars.get(i + 4).is_none_or(|d| !d.is_ascii_digit());
                 if d1 && d2 && d3 && boundary && !d4 {
                     int_token.push('.');
                     i += 1;

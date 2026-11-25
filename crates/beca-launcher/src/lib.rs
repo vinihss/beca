@@ -11,7 +11,7 @@ use std::{
     rc::Rc,
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc, Arc, Mutex,
+        mpsc, Arc,
     },
     thread,
     time::Duration,
@@ -65,10 +65,10 @@ pub fn serve() -> Result<()> {
 
 fn run_launcher(resident: bool) -> Result<()> {
 
-    let queue: Arc<Mutex<VecDeque<Rc<MinimalSoftwareWindow>>>> = Arc::new(Mutex::new(VecDeque::new()));
+    let queue: Rc<RefCell<VecDeque<Rc<MinimalSoftwareWindow>>>> = Rc::new(RefCell::new(VecDeque::new()));
     beca_layer_shell::install_platform(queue.clone());
     let msw = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
-    queue.lock().unwrap().push_back(msw.clone());
+    queue.borrow_mut().push_back(msw.clone());
 
     let window = SearchWindow::new().context("could not create SearchWindow")?;
     apply_beca_theme(&window);
@@ -115,10 +115,10 @@ fn run_launcher(resident: bool) -> Result<()> {
         "search_window",
         lua.create_function(move |lua, options: Option<Table>| {
             if let Some(options) = options {
-                if let Ok(placeholder) = options.get::<String>("placeholder") {
-                    if let Some(w) = weak.upgrade() {
-                        w.set_placeholder(placeholder.into());
-                    }
+                if let Ok(placeholder) = options.get::<String>("placeholder")
+                    && let Some(w) = weak.upgrade()
+                {
+                    w.set_placeholder(placeholder.into());
                 }
                 let _ = options.get::<String>("title");
             }
@@ -194,10 +194,10 @@ fn run_launcher(resident: bool) -> Result<()> {
                         w.set_query("".into());
                         w.set_selected_index(0);
                     }
-                    if let Some(search) = slot_show.borrow().clone() {
-                        if let Ok(cb) = search.get::<Function>("on_search") {
-                            let _ = cb.call::<()>(String::new());
-                        }
+                    if let Some(search) = slot_show.borrow().clone()
+                        && let Ok(cb) = search.get::<Function>("on_search")
+                    {
+                        let _ = cb.call::<()>(String::new());
                     }
                     if let Some(w) = weak_show.upgrade() {
                         w.window().request_redraw();
@@ -226,12 +226,11 @@ fn run_launcher(resident: bool) -> Result<()> {
     {
         let slot = search_slot.clone();
         window.on_search_requested(move |query| {
-            if let Some(search) = slot.borrow().clone() {
-                if let Ok(cb) = search.get::<Function>("on_search") {
-                    if let Err(e) = cb.call::<()>(query.to_string()) {
-                        eprintln!("Lua on_search failed: {e}");
-                    }
-                }
+            if let Some(search) = slot.borrow().clone()
+                && let Ok(cb) = search.get::<Function>("on_search")
+                && let Err(e) = cb.call::<()>(query.to_string())
+            {
+                eprintln!("Lua on_search failed: {e}");
             }
         });
     }
@@ -239,12 +238,11 @@ fn run_launcher(resident: bool) -> Result<()> {
         let slot = search_slot.clone();
         let weak_hide = window.as_weak();
         window.on_result_selected(move |item| {
-            if let Some(search) = slot.borrow().clone() {
-                if let Ok(cb) = search.get::<Function>("on_select") {
-                    if let Err(e) = cb.call::<()>(item.to_string()) {
-                        eprintln!("Lua on_select failed: {e}");
-                    }
-                }
+            if let Some(search) = slot.borrow().clone()
+                && let Ok(cb) = search.get::<Function>("on_select")
+                && let Err(e) = cb.call::<()>(item.to_string())
+            {
+                eprintln!("Lua on_select failed: {e}");
             }
 
             if let Some(w) = weak_hide.upgrade() {
@@ -369,10 +367,10 @@ fn start_control_listener(
                         w.set_query("".into());
                         w.set_selected_index(0);
                     }
-                    if let Some(search) = slot.borrow().clone() {
-                        if let Ok(cb) = search.get::<Function>("on_search") {
-                            let _ = cb.call::<()>(String::new());
-                        }
+                    if let Some(search) = slot.borrow().clone()
+                        && let Ok(cb) = search.get::<Function>("on_search")
+                    {
+                        let _ = cb.call::<()>(String::new());
                     }
                     if let Some(w) = weak.upgrade() {
                         w.window().request_redraw();

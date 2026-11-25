@@ -13,14 +13,14 @@ const HISTORY_LIMIT: usize = 30;
 fn apps_cache() -> &'static RwLock<Vec<Application>> {
     APPS_CACHE.get_or_init(|| {
         let mut apps = read_applications();
-        apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        apps.sort_by_key(|a| a.name.to_lowercase());
         RwLock::new(apps)
     })
 }
 
 pub fn reload_index() {
     let mut apps = read_applications();
-    apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    apps.sort_by_key(|a| a.name.to_lowercase());
     if let Ok(mut cache) = apps_cache().write() {
         *cache = apps;
     }
@@ -166,10 +166,10 @@ fn collect_desktop_files(root: &Path, apps: &mut Vec<Application>) {
         let path = entry.path();
         if path.is_dir() {
             collect_desktop_files(&path, apps);
-        } else if path.extension().is_some_and(|ext| ext == "desktop") {
-            if let Some(app) = parse_desktop_file(&path) {
-                apps.push(app);
-            }
+        } else if path.extension().is_some_and(|ext| ext == "desktop")
+            && let Some(app) = parse_desktop_file(&path)
+        {
+            apps.push(app);
         }
     }
 }
