@@ -30,7 +30,7 @@
 - **`crates/beca-apps`**: `desktop_entry.rs` + `indexer.rs` (discovery/launch `.desktop`).
 - **`crates/beca-ui`**: `ui/` (kit: `Theme` in-out, `SearchWindow`, `VoiceCaptureWindow`, `bar/`, `voice/`, `components/`), `src/{lib,ui_loader,theme}.rs` + `src/voice/` (capture/transcribe/quick/streaming/view).
 - **`crates/beca-layer-shell`**: layer-shell surfaces (`bar.rs`, `launcher.rs`, `quick.rs`, `voice.rs`, `platform.rs`) — resident bar/standalone HUD windows.
-- **`crates/beca-widgets`**: `WidgetId`, system readers (clock/volume/network/stats/alerts) and actions, shared by both bar renderers.
+- **`crates/beca-widgets`**: `WidgetId`, `WidgetController`/`WidgetSink`, system readers (clock/volume/network/stats/alerts) and actions, shared by both bar renderers.
 - **Daemon**: unix socket JSON lines, typed `Request` enum with `#[serde(tag = "type")]` (wire format unchanged) — `ping/version/hyprland.dispatch`/`hyprland.socket_paths`, `mod` (routing/spawn), `bar.status`, `launcher.status`, `config.reload`, `hyprland.subscribe` (stream `.socket2.sock`).
 - **`beca.*` runtime**: `system` (notify/clipboard/exec/env/paths/log), `voice` (transcribe/config), `events` (on/off/emit), `runtime` (config/theme/paths/reload), `ui` (window/run/quit), `hyprland` (dispatch `{ok,response}`/read_events).
 

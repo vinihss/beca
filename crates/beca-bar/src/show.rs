@@ -1,11 +1,202 @@
 use super::*;
 use crate::hyprland::{clear_reserved_for_position, dock_bar_hyprland, set_monitor_reserved};
 use beca_core::BarProperties;
-use beca_widgets::{
-    adjust_volume, converse_spawn_or_signal, format_clock, open_alerts_panel,
-    open_bluetooth_panel, open_network_panel, read_alerts, read_bluetooth, read_cpu, read_disk,
-    read_memory, read_network, read_volume, toggle_volume_mute,
-};
+use beca_widgets::{WidgetAction, WidgetController, WidgetLayout, WidgetSink};
+use slint_interpreter::{ComponentInstance, Value};
+
+struct InterpreterSink<'a> {
+    app: &'a ComponentInstance,
+}
+
+impl InterpreterSink<'_> {
+    fn write(&self, property: String, value: Value) {
+        let _ = self.app.set_property(property.as_str(), value);
+    }
+}
+
+impl WidgetSink for InterpreterSink<'_> {
+    fn set_visible(&self, id: beca_widgets::WidgetId, visible: bool) {
+        self.write(format!("show-{}", id.as_str()), Value::Bool(visible));
+    }
+
+    fn set_section(&self, id: beca_widgets::WidgetId, section: &'static str) {
+        self.write(
+            format!("{}-section", id.as_str()),
+            Value::String(section.into()),
+        );
+    }
+
+    fn set_text(&self, id: beca_widgets::WidgetId, text: &str) {
+        self.write(format!("{}-text", id.as_str()), Value::String(text.into()));
+    }
+
+    fn set_muted(&self, id: beca_widgets::WidgetId, muted: bool) {
+        let property = match id {
+            beca_widgets::WidgetId::VolumeOut => "volume-out-muted",
+            beca_widgets::WidgetId::VolumeIn => "volume-in-muted",
+            _ => return,
+        };
+        self.write(property.into(), Value::Bool(muted));
+    }
+
+    fn set_active(&self, id: beca_widgets::WidgetId, active: bool) {
+        if id != beca_widgets::WidgetId::Conversation {
+            return;
+        }
+        self.write("conversation-active".into(), Value::Bool(active));
+    }
+}
+
+fn apply_action(app: &ComponentInstance, controller: &WidgetController, action: WidgetAction) {
+    let sink = InterpreterSink { app };
+    if let Some(update) = controller.act(action) {
+        update.apply(&sink);
+    }
+}
+
+fn bind_callbacks(app: &ComponentInstance, controller: WidgetController) {
+    {
+        let weak = app.as_weak();
+        let controller = controller.clone();
+        let _ = app.set_callback("launcher-clicked", move |_args| {
+            if let Some(app) = weak.upgrade() {
+                apply_action(&app, &controller, WidgetAction::Launcher);
+            }
+            Value::Void
+        });
+    }
+
+    {
+        let weak = app.as_weak();
+        let controller = controller.clone();
+        let _ = app.set_callback("alerts-clicked", move |_args| {
+            if let Some(app) = weak.upgrade() {
+                apply_action(&app, &controller, WidgetAction::Alerts);
+            }
+            Value::Void
+        });
+    }
+
+    {
+        let weak = app.as_weak();
+        let controller = controller.clone();
+        let _ = app.set_callback("conversation-clicked", move |_args| {
+            if let Some(app) = weak.upgrade() {
+                apply_action(&app, &controller, WidgetAction::ConversationToggle);
+            }
+            Value::Void
+        });
+    }
+
+    {
+        let weak = app.as_weak();
+        let controller = controller.clone();
+        let _ = app.set_callback("volume-out-scrolled", move |args| {
+            let delta = scroll_delta(args);
+            if delta == 0.0 {
+                return Value::Void;
+            }
+            if let Some(app) = weak.upgrade() {
+                apply_action(
+                    &app,
+                    &controller,
+                    WidgetAction::VolumeScroll {
+                        id: beca_widgets::WidgetId::VolumeOut,
+                        up: delta > 0.0,
+                    },
+                );
+            }
+            Value::Void
+        });
+    }
+
+    {
+        let weak = app.as_weak();
+        let controller = controller.clone();
+        let _ = app.set_callback("volume-in-scrolled", move |args| {
+            let delta = scroll_delta(args);
+            if delta == 0.0 {
+                return Value::Void;
+            }
+            if let Some(app) = weak.upgrade() {
+                apply_action(
+                    &app,
+                    &controller,
+                    WidgetAction::VolumeScroll {
+                        id: beca_widgets::WidgetId::VolumeIn,
+                        up: delta > 0.0,
+                    },
+                );
+            }
+            Value::Void
+        });
+    }
+
+    {
+        let weak = app.as_weak();
+        let controller = controller.clone();
+        let _ = app.set_callback("volume-out-clicked", move |_args| {
+            if let Some(app) = weak.upgrade() {
+                apply_action(
+                    &app,
+                    &controller,
+                    WidgetAction::VolumeMute {
+                        id: beca_widgets::WidgetId::VolumeOut,
+                    },
+                );
+            }
+            Value::Void
+        });
+    }
+
+    {
+        let weak = app.as_weak();
+        let controller = controller.clone();
+        let _ = app.set_callback("volume-in-clicked", move |_args| {
+            if let Some(app) = weak.upgrade() {
+                apply_action(
+                    &app,
+                    &controller,
+                    WidgetAction::VolumeMute {
+                        id: beca_widgets::WidgetId::VolumeIn,
+                    },
+                );
+            }
+            Value::Void
+        });
+    }
+
+    {
+        let weak = app.as_weak();
+        let controller = controller.clone();
+        let _ = app.set_callback("network-clicked", move |_args| {
+            if let Some(app) = weak.upgrade() {
+                apply_action(&app, &controller, WidgetAction::Network);
+            }
+            Value::Void
+        });
+    }
+
+    {
+        let weak = app.as_weak();
+        let controller = controller.clone();
+        let _ = app.set_callback("bluetooth-clicked", move |_args| {
+            if let Some(app) = weak.upgrade() {
+                apply_action(&app, &controller, WidgetAction::Bluetooth);
+            }
+            Value::Void
+        });
+    }
+}
+
+fn scroll_delta(args: &[Value]) -> f32 {
+    args.first()
+        .and_then(|value| match value {
+            Value::Number(number) => Some(*number as f32),
+            _ => None,
+        })
+        .unwrap_or(0.0)
+}
 
 pub fn show(position: &str) -> Result<()> {
     let resolved = beca_core::config::load();
@@ -27,7 +218,9 @@ pub fn show(position: &str) -> Result<()> {
             match beca_layer_shell::run_bar(pos, &bar_cfg, widgets, theme) {
                 Ok(()) => return Ok(()),
                 Err(e) => {
-                    eprintln!("[beca-bar] layer-shell unavailable, falling back to window mode: {e}");
+                    eprintln!(
+                        "[beca-bar] layer-shell unavailable, falling back to window mode: {e}"
+                    );
 
                     if e.contains("dispatch:")
                         || e.contains("roundtrip:")
@@ -46,9 +239,9 @@ pub fn show(position: &str) -> Result<()> {
                                 Ok(s) => anyhow::bail!(
                                     "bar window fallback process exited with status {s}"
                                 ),
-                                Err(err) => anyhow::bail!(
-                                    "failed to spawn bar window fallback: {err}"
-                                ),
+                                Err(err) => {
+                                    anyhow::bail!("failed to spawn bar window fallback: {err}")
+                                }
                             }
                         }
                     }
@@ -63,37 +256,16 @@ pub fn show(position: &str) -> Result<()> {
     ui_loader::apply_theme_global(&app, &theme);
 
     let props = BarProperties::from_config(&bar_cfg);
-    let set_widget = |widget: &str, show_key: &str, section_key: &str| {
-        if let Some(section) = props.section(widget) {
-            let _ = app.set_property(show_key, Value::Bool(true));
-            let _ = app.set_property(section_key, Value::String(section.into()));
-        } else {
-            let _ = app.set_property(show_key, Value::Bool(false));
-        }
-    };
+    let layout = WidgetLayout::from_lookup(|name| props.section(name));
+    let controller = WidgetController::new(layout, widgets.clock.format.clone());
+
+    {
+        let sink = InterpreterSink { app: &app };
+        controller.apply_layout(&sink);
+        controller.sample_all(&sink);
+    }
 
     let _ = app.set_property("position", Value::String(position.into()));
-    set_widget("clock", "show-clock", "clock-section");
-    set_widget("launcher", "show-launcher", "launcher-section");
-    set_widget("conversation", "show-conversation", "conversation-section");
-    set_widget("volume-out", "show-volume-out", "volume-out-section");
-    set_widget("volume-in", "show-volume-in", "volume-in-section");
-    set_widget("network", "show-network", "network-section");
-    set_widget("alerts", "show-alerts", "alerts-section");
-    set_widget("bluetooth", "show-bluetooth", "bluetooth-section");
-    set_widget("cpu", "show-cpu", "cpu-section");
-    set_widget("memory", "show-memory", "memory-section");
-    set_widget("disk", "show-disk", "disk-section");
-
-    let show_volume_out = props.visible("volume-out");
-    let show_volume_in = props.visible("volume-in");
-    let show_network = props.visible("network");
-    let show_alerts = props.visible("alerts");
-    let show_bluetooth = props.visible("bluetooth");
-    let show_cpu = props.visible("cpu");
-    let show_memory = props.visible("memory");
-    let show_disk = props.visible("disk");
-
     let _ = app.set_property(
         "launcher-label",
         Value::String(widgets.launcher.label.clone().into()),
@@ -120,266 +292,25 @@ pub fn show(position: &str) -> Result<()> {
         let _ = app.set_property("bar-background", Value::Brush(color.into()));
     }
 
-    let clock_format = widgets.clock.format.clone();
-    let initial = format_clock(&clock_format);
-    let _ = app.set_property("clock-text", Value::String(initial.into()));
-    if show_volume_out {
-        let v = read_volume("@DEFAULT_AUDIO_SINK@");
-        let _ = app.set_property("volume-out-text", Value::String(v.text.into()));
-        let _ = app.set_property("volume-out-muted", Value::Bool(v.muted));
-    }
-    if show_volume_in {
-        let v = read_volume("@DEFAULT_AUDIO_SOURCE@");
-        let _ = app.set_property("volume-in-text", Value::String(v.text.into()));
-        let _ = app.set_property("volume-in-muted", Value::Bool(v.muted));
-    }
-    if show_network { let _ = app.set_property("network-text", Value::String(read_network().into())); }
-    if show_alerts { let _ = app.set_property("alerts-text", Value::String(read_alerts().into())); }
-    if show_bluetooth { let _ = app.set_property("bluetooth-text", Value::String(read_bluetooth().into())); }
-    if show_cpu { let _ = app.set_property("cpu-text", Value::String(read_cpu().into())); }
-    if show_memory { let _ = app.set_property("memory-text", Value::String(read_memory().into())); }
-    if show_disk { let _ = app.set_property("disk-text", Value::String(read_disk().into())); }
-
-    let _ = app.set_callback("launcher-clicked", |_args| {
-        let exe = std::env::current_exe()
-            .ok()
-            .and_then(|p| p.to_str().map(|s| s.to_string()))
-            .unwrap_or_else(|| "beca".to_string());
-        let _ = Command::new(exe).args(["mod", "launcher:show"]).spawn();
-        Value::Void
-    });
-    let _ = app.set_callback("alerts-clicked", |_args| {
-        open_alerts_panel();
-        Value::Void
-    });
-
-    let converse_slot: Arc<std::sync::Mutex<Option<std::process::Child>>> =
-        Arc::new(std::sync::Mutex::new(None));
-
-    {
-        let converse_slot = converse_slot.clone();
-        let weak_converse = app.as_weak();
-        let _ = app.set_callback("conversation-clicked", move |_args| {
-            let active = converse_spawn_or_signal(&converse_slot);
-            let weak2 = weak_converse.clone();
-            let _ = ui_loader::invoke_on_event_loop(move || {
-                if let Some(app) = weak2.upgrade() {
-                    let _ = app.set_property("conversation-active", Value::Bool(active));
-                }
-            });
-            Value::Void
-        });
-    }
-
-    {
-        let weak = app.as_weak();
-        let _ = app.set_callback("volume-out-scrolled", move |args| {
-            let delta = args
-                .first()
-                .and_then(|v| match v {
-                    Value::Number(n) => Some(*n as f32),
-                    _ => None,
-                })
-                .unwrap_or(0.0);
-            if delta != 0.0 {
-                adjust_volume("@DEFAULT_AUDIO_SINK@", delta > 0.0);
-                let v = read_volume("@DEFAULT_AUDIO_SINK@");
-                let weak2 = weak.clone();
-                let _ = ui_loader::invoke_on_event_loop(move || {
-                    if let Some(app) = weak2.upgrade() {
-                        let _ = app.set_property("volume-out-text", Value::String(v.text.into()));
-                        let _ = app.set_property("volume-out-muted", Value::Bool(v.muted));
-                    }
-                });
-            }
-            Value::Void
-        });
-    }
-
-    {
-        let weak = app.as_weak();
-        let _ = app.set_callback("volume-in-scrolled", move |args| {
-            let delta = args
-                .first()
-                .and_then(|v| match v {
-                    Value::Number(n) => Some(*n as f32),
-                    _ => None,
-                })
-                .unwrap_or(0.0);
-            if delta != 0.0 {
-                adjust_volume("@DEFAULT_AUDIO_SOURCE@", delta > 0.0);
-                let v = read_volume("@DEFAULT_AUDIO_SOURCE@");
-                let weak2 = weak.clone();
-                let _ = ui_loader::invoke_on_event_loop(move || {
-                    if let Some(app) = weak2.upgrade() {
-                        let _ = app.set_property("volume-in-text", Value::String(v.text.into()));
-                        let _ = app.set_property("volume-in-muted", Value::Bool(v.muted));
-                    }
-                });
-            }
-            Value::Void
-        });
-    }
-
-    {
-        let weak = app.as_weak();
-        let _ = app.set_callback("volume-out-clicked", move |_args| {
-            toggle_volume_mute("@DEFAULT_AUDIO_SINK@");
-            let v = read_volume("@DEFAULT_AUDIO_SINK@");
-            let weak2 = weak.clone();
-            let _ = ui_loader::invoke_on_event_loop(move || {
-                if let Some(app) = weak2.upgrade() {
-                    let _ = app.set_property("volume-out-text", Value::String(v.text.into()));
-                    let _ = app.set_property("volume-out-muted", Value::Bool(v.muted));
-                }
-            });
-            Value::Void
-        });
-    }
-    {
-        let weak = app.as_weak();
-        let _ = app.set_callback("volume-in-clicked", move |_args| {
-            toggle_volume_mute("@DEFAULT_AUDIO_SOURCE@");
-            let v = read_volume("@DEFAULT_AUDIO_SOURCE@");
-            let weak2 = weak.clone();
-            let _ = ui_loader::invoke_on_event_loop(move || {
-                if let Some(app) = weak2.upgrade() {
-                    let _ = app.set_property("volume-in-text", Value::String(v.text.into()));
-                    let _ = app.set_property("volume-in-muted", Value::Bool(v.muted));
-                }
-            });
-            Value::Void
-        });
-    }
-    let _ = app.set_callback("network-clicked", |_args| {
-        open_network_panel();
-        Value::Void
-    });
-    let _ = app.set_callback("bluetooth-clicked", |_args| {
-        open_bluetooth_panel();
-        Value::Void
-    });
+    bind_callbacks(&app, controller.clone());
 
     let running = Arc::new(AtomicBool::new(true));
-
-    {
-        let converse_slot = converse_slot.clone();
-        let weak_poll = app.as_weak();
+    for (interval, group) in controller.timer_specs() {
         let running_flag = running.clone();
+        let controller = controller.clone();
+        let weak = app.as_weak();
         thread::spawn(move || {
-            let mut was_running = false;
             while running_flag.load(Ordering::Relaxed) {
-                let mut run = false;
-                if let Ok(mut slot) = converse_slot.lock() {
-                    if let Some(child) = slot.as_mut() {
-                        match child.try_wait() {
-                            Ok(Some(_)) => {
-                                *slot = None;
-                            }
-                            Ok(None) => {
-                                run = true;
-                            }
-                            Err(_) => {
-                                run = true;
-                            }
-                        }
-                    }
-                }
-                if run != was_running {
-                    was_running = run;
-                    let weak2 = weak_poll.clone();
+                if let Some(update) = controller.sample(group) {
+                    let weak2 = weak.clone();
                     let _ = ui_loader::invoke_on_event_loop(move || {
                         if let Some(app) = weak2.upgrade() {
-                            let _ = app.set_property("conversation-active", Value::Bool(run));
+                            let sink = InterpreterSink { app: &app };
+                            update.apply(&sink);
                         }
                     });
                 }
-                thread::sleep(Duration::from_millis(250));
-            }
-        });
-    }
-
-    let weak_clock = app.as_weak();
-    let fmt = clock_format;
-    let show_clock = props.visible("clock");
-    if show_clock {
-        let running_flag = running.clone();
-        thread::spawn(move || {
-
-            let interval = if fmt.contains("%S") {
-                Duration::from_secs(1)
-            } else {
-                Duration::from_secs(30)
-            };
-            while running_flag.load(Ordering::Relaxed) {
-                let text = format_clock(&fmt);
-                let weak2 = weak_clock.clone();
-                let _ = ui_loader::invoke_on_event_loop(move || {
-                    if let Some(app) = weak2.upgrade() {
-                        let _ = app.set_property("clock-text", Value::String(text.into()));
-                    }
-                });
                 thread::sleep(interval);
-            }
-        });
-    }
-
-    if show_volume_out || show_volume_in {
-        let running_flag = running.clone();
-        let weak_vol = app.as_weak();
-        thread::spawn(move || {
-            while running_flag.load(Ordering::Relaxed) {
-                let out = if show_volume_out {
-                    Some(read_volume("@DEFAULT_AUDIO_SINK@"))
-                } else {
-                    None
-                };
-                let inp = if show_volume_in {
-                    Some(read_volume("@DEFAULT_AUDIO_SOURCE@"))
-                } else {
-                    None
-                };
-                let weak2 = weak_vol.clone();
-                let _ = ui_loader::invoke_on_event_loop(move || {
-                    if let Some(app) = weak2.upgrade() {
-                        if let Some(v) = out {
-                            let _ = app.set_property("volume-out-text", Value::String(v.text.into()));
-                            let _ = app.set_property("volume-out-muted", Value::Bool(v.muted));
-                        }
-                        if let Some(v) = inp {
-                            let _ = app.set_property("volume-in-text", Value::String(v.text.into()));
-                            let _ = app.set_property("volume-in-muted", Value::Bool(v.muted));
-                        }
-                    }
-                });
-                thread::sleep(Duration::from_secs(2));
-            }
-        });
-    }
-
-    if show_network || show_alerts || show_bluetooth || show_cpu || show_memory || show_disk {
-        let running_flag = running.clone();
-        let weak_stats = app.as_weak();
-        thread::spawn(move || {
-            while running_flag.load(Ordering::Relaxed) {
-                let net = if show_network { Some(read_network()) } else { None };
-                let al = if show_alerts { Some(read_alerts()) } else { None };
-                let bt = if show_bluetooth { Some(read_bluetooth()) } else { None };
-                let cpu = if show_cpu { Some(read_cpu()) } else { None };
-                let mem = if show_memory { Some(read_memory()) } else { None };
-                let disk = if show_disk { Some(read_disk()) } else { None };
-                let weak2 = weak_stats.clone();
-                let _ = ui_loader::invoke_on_event_loop(move || {
-                    if let Some(app) = weak2.upgrade() {
-                        if let Some(v) = net { let _ = app.set_property("network-text", Value::String(v.into())); }
-                        if let Some(v) = al { let _ = app.set_property("alerts-text", Value::String(v.into())); }
-                        if let Some(v) = bt { let _ = app.set_property("bluetooth-text", Value::String(v.into())); }
-                        if let Some(v) = cpu { let _ = app.set_property("cpu-text", Value::String(v.into())); }
-                        if let Some(v) = mem { let _ = app.set_property("memory-text", Value::String(v.into())); }
-                        if let Some(v) = disk { let _ = app.set_property("disk-text", Value::String(v.into())); }
-                    }
-                });
-                thread::sleep(Duration::from_secs(3));
             }
         });
     }

@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use beca_ui::ui_loader;
-use slint_interpreter::{ComponentHandle, Value};
+use slint_interpreter::ComponentHandle;
 use std::process::Command;
 use std::sync::{
     Arc,

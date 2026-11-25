@@ -10,7 +10,8 @@ use std::io::Write;
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::process::{Child, Command};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 /// Canonical widget names accepted in bar layout lists.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,6 +30,37 @@ pub enum WidgetId {
 }
 
 impl WidgetId {
+    /// Every widget id in canonical layout order.
+    pub const ALL: [Self; 11] = [
+        Self::Launcher,
+        Self::Clock,
+        Self::Conversation,
+        Self::VolumeOut,
+        Self::VolumeIn,
+        Self::Network,
+        Self::Alerts,
+        Self::Bluetooth,
+        Self::Cpu,
+        Self::Memory,
+        Self::Disk,
+    ];
+
+    fn index(self) -> usize {
+        match self {
+            Self::Launcher => 0,
+            Self::Clock => 1,
+            Self::Conversation => 2,
+            Self::VolumeOut => 3,
+            Self::VolumeIn => 4,
+            Self::Network => 5,
+            Self::Alerts => 6,
+            Self::Bluetooth => 7,
+            Self::Cpu => 8,
+            Self::Memory => 9,
+            Self::Disk => 10,
+        }
+    }
+
     /// Parses a configured name, accepting the same aliases as before.
     pub fn parse(name: &str) -> Option<Self> {
         match name.trim().to_ascii_lowercase().as_str() {
@@ -449,6 +481,325 @@ pub fn converse_spawn_or_signal(slot: &Mutex<Option<Child>>) -> bool {
     false
 }
 
+/// A value written by a widget source to a renderer.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WidgetValue {
+    Text(String),
+    Muted(bool),
+    Active(bool),
+}
+
+/// Renderer-agnostic batch of widget changes.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct WidgetUpdate {
+    values: Vec<(WidgetId, WidgetValue)>,
+}
+
+impl WidgetUpdate {
+    pub fn text(id: WidgetId, text: impl Into<String>) -> Self {
+        Self::default().with(id, WidgetValue::Text(text.into()))
+    }
+
+    pub fn muted(id: WidgetId, muted: bool) -> Self {
+        Self::default().with(id, WidgetValue::Muted(muted))
+    }
+
+    pub fn active(id: WidgetId, active: bool) -> Self {
+        Self::default().with(id, WidgetValue::Active(active))
+    }
+
+    pub fn volume(id: WidgetId, info: VolumeInfo) -> Self {
+        Self::default()
+            .with(id, WidgetValue::Text(info.text))
+            .with(id, WidgetValue::Muted(info.muted))
+    }
+
+    /// Appends another value to this update.
+    pub fn with(mut self, id: WidgetId, value: WidgetValue) -> Self {
+        self.values.push((id, value));
+        self
+    }
+
+    /// Writes every value through `sink`.
+    pub fn apply<S: WidgetSink>(&self, sink: &S) {
+        for (id, value) in &self.values {
+            match value {
+                WidgetValue::Text(text) => sink.set_text(*id, text),
+                WidgetValue::Muted(muted) => sink.set_muted(*id, *muted),
+                WidgetValue::Active(active) => sink.set_active(*id, *active),
+            }
+        }
+    }
+}
+
+/// Minimal renderer contract used by the widget controller.
+///
+/// Both bar renderers implement this trait; neither needs to know where the
+/// data came from or which command produced it.
+pub trait WidgetSink {
+    fn set_visible(&self, id: WidgetId, visible: bool);
+    fn set_section(&self, id: WidgetId, section: &'static str);
+    fn set_text(&self, id: WidgetId, text: &str);
+    fn set_muted(&self, id: WidgetId, muted: bool);
+    fn set_active(&self, id: WidgetId, active: bool);
+}
+
+/// Resolved layout for widget ids.
+#[derive(Clone, Debug, Default)]
+pub struct WidgetLayout {
+    sections: [Option<&'static str>; 11],
+}
+
+impl WidgetLayout {
+    /// Builds a layout by querying a resolver such as `BarProperties::section`.
+    pub fn from_lookup<F>(lookup: F) -> Self
+    where
+        F: Fn(&str) -> Option<&'static str>,
+    {
+        let mut sections = [None; 11];
+        for id in WidgetId::ALL {
+            sections[id.index()] = lookup(id.as_str());
+        }
+        Self { sections }
+    }
+
+    pub fn section(&self, id: WidgetId) -> Option<&'static str> {
+        self.sections[id.index()]
+    }
+
+    pub fn visible(&self, id: WidgetId) -> bool {
+        self.section(id).is_some()
+    }
+
+    pub fn any_visible(&self, ids: &[WidgetId]) -> bool {
+        ids.iter().copied().any(|id| self.visible(id))
+    }
+}
+
+/// Grouping used by the renderer timers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WidgetGroup {
+    Clock,
+    Volume,
+    Conversation,
+    Stats,
+}
+
+impl WidgetGroup {
+    pub const ALL: [Self; 4] = [Self::Clock, Self::Volume, Self::Conversation, Self::Stats];
+}
+
+/// User-triggered widget action.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WidgetAction {
+    Launcher,
+    ConversationToggle,
+    VolumeScroll { id: WidgetId, up: bool },
+    VolumeMute { id: WidgetId },
+    Alerts,
+    Network,
+    Bluetooth,
+}
+
+/// Owns widget state and produces updates for any renderer.
+#[derive(Clone)]
+pub struct WidgetController {
+    layout: Arc<WidgetLayout>,
+    clock_format: Arc<str>,
+    converse_child: Arc<Mutex<Option<Child>>>,
+}
+
+impl WidgetController {
+    pub fn new(layout: WidgetLayout, clock_format: impl Into<String>) -> Self {
+        Self {
+            layout: Arc::new(layout),
+            clock_format: Arc::from(clock_format.into().as_str()),
+            converse_child: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    pub fn layout(&self) -> &WidgetLayout {
+        &self.layout
+    }
+
+    pub fn clock_interval(&self) -> Duration {
+        if self.clock_format.contains("%S") {
+            Duration::from_secs(1)
+        } else {
+            Duration::from_secs(30)
+        }
+    }
+
+    /// Timer intervals for the widgets enabled in the current layout.
+    pub fn timer_specs(&self) -> Vec<(Duration, WidgetGroup)> {
+        let mut specs = vec![(Duration::from_millis(250), WidgetGroup::Conversation)];
+        if self.layout.visible(WidgetId::Clock) {
+            specs.push((self.clock_interval(), WidgetGroup::Clock));
+        }
+        if self
+            .layout
+            .any_visible(&[WidgetId::VolumeOut, WidgetId::VolumeIn])
+        {
+            specs.push((Duration::from_secs(2), WidgetGroup::Volume));
+        }
+        if self.layout.any_visible(&[
+            WidgetId::Network,
+            WidgetId::Alerts,
+            WidgetId::Bluetooth,
+            WidgetId::Cpu,
+            WidgetId::Memory,
+            WidgetId::Disk,
+        ]) {
+            specs.push((Duration::from_secs(3), WidgetGroup::Stats));
+        }
+        specs
+    }
+
+    /// Writes the resolved visibility and section of every widget.
+    pub fn apply_layout<S: WidgetSink>(&self, sink: &S) {
+        for id in WidgetId::ALL {
+            let visible = self.layout.visible(id);
+            sink.set_visible(id, visible);
+            if visible && let Some(section) = self.layout.section(id) {
+                sink.set_section(id, section);
+            }
+        }
+    }
+
+    /// Samples one group of widgets.
+    pub fn sample(&self, group: WidgetGroup) -> Option<WidgetUpdate> {
+        match group {
+            WidgetGroup::Clock => self
+                .layout
+                .visible(WidgetId::Clock)
+                .then(|| WidgetUpdate::text(WidgetId::Clock, format_clock(&self.clock_format))),
+            WidgetGroup::Volume => {
+                let mut update = WidgetUpdate::default();
+                if self.layout.visible(WidgetId::VolumeOut) {
+                    let info = read_volume("@DEFAULT_AUDIO_SINK@");
+                    update = update
+                        .with(WidgetId::VolumeOut, WidgetValue::Text(info.text))
+                        .with(WidgetId::VolumeOut, WidgetValue::Muted(info.muted));
+                }
+                if self.layout.visible(WidgetId::VolumeIn) {
+                    let info = read_volume("@DEFAULT_AUDIO_SOURCE@");
+                    update = update
+                        .with(WidgetId::VolumeIn, WidgetValue::Text(info.text))
+                        .with(WidgetId::VolumeIn, WidgetValue::Muted(info.muted));
+                }
+                (!update.is_empty()).then_some(update)
+            }
+            WidgetGroup::Conversation => Some(WidgetUpdate::active(
+                WidgetId::Conversation,
+                conversation_active(&self.converse_child),
+            )),
+            WidgetGroup::Stats => {
+                let mut update = WidgetUpdate::default();
+                if self.layout.visible(WidgetId::Network) {
+                    update = update.with(WidgetId::Network, WidgetValue::Text(read_network()));
+                }
+                if self.layout.visible(WidgetId::Alerts) {
+                    update = update.with(WidgetId::Alerts, WidgetValue::Text(read_alerts()));
+                }
+                if self.layout.visible(WidgetId::Bluetooth) {
+                    update = update.with(WidgetId::Bluetooth, WidgetValue::Text(read_bluetooth()));
+                }
+                if self.layout.visible(WidgetId::Cpu) {
+                    update = update.with(WidgetId::Cpu, WidgetValue::Text(read_cpu()));
+                }
+                if self.layout.visible(WidgetId::Memory) {
+                    update = update.with(WidgetId::Memory, WidgetValue::Text(read_memory()));
+                }
+                if self.layout.visible(WidgetId::Disk) {
+                    update = update.with(WidgetId::Disk, WidgetValue::Text(read_disk()));
+                }
+                (!update.is_empty()).then_some(update)
+            }
+        }
+    }
+
+    /// Samples all groups and writes them to `sink`.
+    pub fn sample_all<S: WidgetSink>(&self, sink: &S) {
+        for group in WidgetGroup::ALL {
+            if let Some(update) = self.sample(group) {
+                update.apply(sink);
+            }
+        }
+    }
+
+    /// Performs an action and returns the immediate update, if any.
+    pub fn act(&self, action: WidgetAction) -> Option<WidgetUpdate> {
+        match action {
+            WidgetAction::Launcher => {
+                let exe = std::env::current_exe()
+                    .ok()
+                    .and_then(|p| p.to_str().map(|s| s.to_string()))
+                    .unwrap_or_else(|| "beca".to_string());
+                let _ = Command::new(exe).args(["mod", "launcher:show"]).spawn();
+                None
+            }
+            WidgetAction::ConversationToggle => {
+                let active = converse_spawn_or_signal(&self.converse_child);
+                Some(WidgetUpdate::active(WidgetId::Conversation, active))
+            }
+            WidgetAction::VolumeScroll { id, up } => {
+                let target = volume_target(id)?;
+                adjust_volume(target, up);
+                let info = read_volume(target);
+                Some(WidgetUpdate::volume(id, info))
+            }
+            WidgetAction::VolumeMute { id } => {
+                let target = volume_target(id)?;
+                toggle_volume_mute(target);
+                let info = read_volume(target);
+                Some(WidgetUpdate::volume(id, info))
+            }
+            WidgetAction::Alerts => {
+                open_alerts_panel();
+                None
+            }
+            WidgetAction::Network => {
+                open_network_panel();
+                None
+            }
+            WidgetAction::Bluetooth => {
+                open_bluetooth_panel();
+                None
+            }
+        }
+    }
+}
+
+impl WidgetUpdate {
+    fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+}
+
+fn volume_target(id: WidgetId) -> Option<&'static str> {
+    match id {
+        WidgetId::VolumeOut => Some("@DEFAULT_AUDIO_SINK@"),
+        WidgetId::VolumeIn => Some("@DEFAULT_AUDIO_SOURCE@"),
+        _ => None,
+    }
+}
+
+fn conversation_active(slot: &Mutex<Option<Child>>) -> bool {
+    match slot.lock() {
+        Ok(mut slot) => match slot.as_mut() {
+            Some(child) => match child.try_wait() {
+                Ok(None) | Err(_) => true,
+                Ok(Some(_)) => {
+                    *slot = None;
+                    false
+                }
+            },
+            None => false,
+        },
+        Err(_) => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -481,5 +832,88 @@ mod tests {
             let id = WidgetId::parse(name).expect("name should parse");
             assert_eq!(id.as_str(), name);
         }
+    }
+
+    #[derive(Default)]
+    struct RecordingSink {
+        values: std::cell::RefCell<Vec<(WidgetId, WidgetValue)>>,
+    }
+
+    impl WidgetSink for RecordingSink {
+        fn set_visible(&self, id: WidgetId, visible: bool) {
+            self.values
+                .borrow_mut()
+                .push((id, WidgetValue::Active(visible)));
+        }
+        fn set_section(&self, id: WidgetId, section: &'static str) {
+            self.values
+                .borrow_mut()
+                .push((id, WidgetValue::Text(section.into())));
+        }
+        fn set_text(&self, id: WidgetId, text: &str) {
+            self.values
+                .borrow_mut()
+                .push((id, WidgetValue::Text(text.into())));
+        }
+        fn set_muted(&self, id: WidgetId, muted: bool) {
+            self.values
+                .borrow_mut()
+                .push((id, WidgetValue::Muted(muted)));
+        }
+        fn set_active(&self, id: WidgetId, active: bool) {
+            self.values
+                .borrow_mut()
+                .push((id, WidgetValue::Active(active)));
+        }
+    }
+
+    #[test]
+    fn layout_uses_the_shared_widget_ids() {
+        let layout = WidgetLayout::from_lookup(|name| match name {
+            "clock" => Some("center"),
+            "volume-out" => Some("end"),
+            _ => None,
+        });
+        let controller = WidgetController::new(layout, "%H:%M");
+        let sink = RecordingSink::default();
+
+        controller.apply_layout(&sink);
+
+        assert!(controller.layout().visible(WidgetId::Clock));
+        assert!(controller.layout().visible(WidgetId::VolumeOut));
+        assert!(!controller.layout().visible(WidgetId::Cpu));
+        assert_eq!(controller.layout().section(WidgetId::Clock), Some("center"));
+        assert!(!sink.values.borrow().is_empty());
+    }
+
+    #[test]
+    fn timer_specs_include_only_enabled_groups() {
+        let layout = WidgetLayout::from_lookup(|name| match name {
+            "clock" => Some("begin"),
+            "network" => Some("end"),
+            _ => None,
+        });
+        let controller = WidgetController::new(layout, "%H:%M");
+        let specs = controller.timer_specs();
+
+        assert_eq!(specs.len(), 3);
+        assert!(specs.iter().any(|(_, g)| *g == WidgetGroup::Conversation));
+        assert!(specs.iter().any(|(_, g)| *g == WidgetGroup::Clock));
+        assert!(specs.iter().any(|(_, g)| *g == WidgetGroup::Stats));
+        assert!(!specs.iter().any(|(_, g)| *g == WidgetGroup::Volume));
+    }
+
+    #[test]
+    fn hidden_groups_are_not_sampled() {
+        let layout = WidgetLayout::from_lookup(|_| None);
+        let controller = WidgetController::new(layout, "%H:%M");
+
+        assert!(controller.sample(WidgetGroup::Clock).is_none());
+        assert!(controller.sample(WidgetGroup::Volume).is_none());
+        assert!(controller.sample(WidgetGroup::Stats).is_none());
+        assert_eq!(
+            controller.sample(WidgetGroup::Conversation),
+            Some(WidgetUpdate::active(WidgetId::Conversation, false))
+        );
     }
 }
