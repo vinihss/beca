@@ -4,10 +4,15 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use beca_core::config::BarModuleConfig;
+use beca_core::config::{BarModuleConfig, WidgetsConfig};
 use beca_core::BarProperties;
 use beca_core::theme::Theme as BecaTheme;
 use beca_ui::{BarWindow, Theme};
+use beca_widgets::{
+    adjust_volume, converse_spawn_or_signal, format_clock, open_alerts_panel,
+    open_bluetooth_panel, open_network_panel, read_alerts, read_bluetooth, read_cpu, read_disk,
+    read_memory, read_network, read_volume, toggle_volume_mute,
+};
 use slint::platform::software_renderer::{MinimalSoftwareWindow, PremultipliedRgbaColor, RepaintBufferType};
 use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, Global, LogicalPosition, Timer, TimerMode};
@@ -48,6 +53,7 @@ pub enum BarPosition {
 pub fn run_bar(
     position: BarPosition,
     bar_cfg: &BarModuleConfig,
+    widgets: &WidgetsConfig,
     theme: &BecaTheme,
 ) -> Result<(), String> {
     let conn = Connection::connect_to_env().map_err(|e| format!("wayland connect: {e}"))?;
@@ -84,6 +90,7 @@ pub fn run_bar(
         anchor,
         exclusive: bar_cfg.exclusive,
         bar_cfg: bar_cfg.clone(),
+        widgets: widgets.clone(),
         theme: theme.clone(),
         position,
         exit: false,
@@ -157,6 +164,7 @@ struct BarState {
     anchor: Anchor,
     exclusive: bool,
     bar_cfg: BarModuleConfig,
+    widgets: WidgetsConfig,
     theme: BecaTheme,
     position: BarPosition,
     exit: bool,
@@ -173,10 +181,10 @@ impl BarState {
 
         let bar = BarWindow::new().map_err(|e| format!("BarWindow: {e}"))?;
         apply_theme(&bar, &self.theme);
-        configure_bar(&bar, &self.bar_cfg, self.position);
+        configure_bar(&bar, &self.bar_cfg, &self.widgets, self.position);
         setup_callbacks(&bar, self.converse_child.clone());
         let _ = bar.show();
-        let _timers = setup_timers(&bar, &self.bar_cfg, self.converse_child.clone());
+        let _timers = setup_timers(&bar, &self.widgets, self.converse_child.clone());
 
         msw.set_size(slint::PhysicalSize::new(800, self.height));
 
@@ -383,7 +391,12 @@ fn apply_theme(bar: &BarWindow, theme: &BecaTheme) {
     tokens.apply_typed(&Theme::get(bar));
 }
 
-fn configure_bar(bar: &BarWindow, cfg: &BarModuleConfig, position: BarPosition) {
+fn configure_bar(
+    bar: &BarWindow,
+    cfg: &BarModuleConfig,
+    widgets: &WidgetsConfig,
+    position: BarPosition,
+) {
     let props = BarProperties::from_config(cfg);
 
     macro_rules! widget {
@@ -404,7 +417,11 @@ fn configure_bar(bar: &BarWindow, cfg: &BarModuleConfig, position: BarPosition) 
 
     widget!("clock", set_show_clock, set_clock_section);
     widget!("launcher", set_show_launcher, set_launcher_section);
-    widget!("conversation", set_show_conversation, set_conversation_section);
+    widget!(
+        "conversation",
+        set_show_conversation,
+        set_conversation_section
+    );
     widget!("volume-out", set_show_volume_out, set_volume_out_section);
     widget!("volume-in", set_show_volume_in, set_volume_in_section);
     widget!("network", set_show_network, set_network_section);
@@ -414,17 +431,21 @@ fn configure_bar(bar: &BarWindow, cfg: &BarModuleConfig, position: BarPosition) 
     widget!("memory", set_show_memory, set_memory_section);
     widget!("disk", set_show_disk, set_disk_section);
 
-    bar.set_launcher_label(cfg.launcher_label.clone().into());
+    bar.set_launcher_label(widgets.launcher.label.clone().into());
     bar.set_conversation_active(false);
-    bar.set_left_align(cfg.left_align.clone().into());
+    bar.set_begin_align(cfg.begin_align.clone().into());
     bar.set_center_align(cfg.center_align.clone().into());
-    bar.set_right_align(cfg.right_align.clone().into());
+    bar.set_end_align(cfg.end_align.clone().into());
     bar.set_background_opacity(cfg.background_opacity);
     bar.set_show_border(cfg.show_border);
-    if let Some(bg) = cfg.background.as_ref().and_then(|s| beca_ui::theme::parse_color(s)) {
+    if let Some(bg) = cfg
+        .background
+        .as_ref()
+        .and_then(|s| beca_ui::theme::parse_color(s))
+    {
         bar.set_bar_background(slint::Brush::SolidColor(bg));
     }
-    bar.set_clock_text(format_clock(&cfg.clock_format).into());
+    bar.set_clock_text(format_clock(&widgets.clock.format).into());
     if bar.get_show_volume_out() { let v = read_volume("@DEFAULT_AUDIO_SINK@"); bar.set_volume_out_text(v.text.into()); bar.set_volume_out_muted(v.muted); }
     if bar.get_show_volume_in() { let v = read_volume("@DEFAULT_AUDIO_SOURCE@"); bar.set_volume_in_text(v.text.into()); bar.set_volume_in_muted(v.muted); }
     if bar.get_show_network() { bar.set_network_text(read_network().into()); }
@@ -433,91 +454,6 @@ fn configure_bar(bar: &BarWindow, cfg: &BarModuleConfig, position: BarPosition) 
     if bar.get_show_cpu() { bar.set_cpu_text(read_cpu().into()); }
     if bar.get_show_memory() { bar.set_memory_text(read_memory().into()); }
     if bar.get_show_disk() { bar.set_disk_text(read_disk().into()); }
-}
-
-fn converse_spawn_or_signal(slot: &std::sync::Arc<Mutex<Option<std::process::Child>>>) -> bool {
-    let mut slot = match slot.lock() {
-        Ok(s) => s,
-        Err(_) => return false,
-    };
-    let mut alive = false;
-    if let Some(child) = slot.as_mut() {
-        match child.try_wait() {
-            Ok(None) => alive = true,
-            Ok(Some(_)) => {
-                *slot = None;
-            }
-            Err(_) => alive = true,
-        }
-    }
-    if alive {
-        if let Some(dir) = std::env::var_os("XDG_RUNTIME_DIR") {
-            let path = std::path::PathBuf::from(dir).join("beca").join("converse.ctl");
-            if let Ok(mut s) = std::os::unix::net::UnixStream::connect(&path) {
-                use std::io::Write;
-                let _ = s.write_all(b"quit\n");
-            } else {
-                eprintln!("[beca-bar] converse ctl unreachable: {}", path.display());
-            }
-        }
-        return false;
-    }
-
-    if let Ok(exe) = std::env::current_exe() {
-        let child = Command::new(exe)
-            .env("BECA_NO_DAEMON", "1")
-            .arg("mod")
-            .arg("--local")
-            .arg("voice:converse")
-            .spawn();
-        match child {
-            Ok(c) => {
-                *slot = Some(c);
-                return true;
-            }
-            Err(e) => eprintln!("[beca-bar] failed to spawn voice:converse: {e}"),
-        }
-    }
-    false
-}
-
-
-
-fn toggle_volume_mute(target: &str) {
-    if !Command::new("wpctl")
-        .args(["set-mute", target, "toggle"])
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-    {
-        let (cmd, t) = if target == "@DEFAULT_AUDIO_SINK@" {
-            ("set-sink-mute", "@DEFAULT_SINK@")
-        } else {
-            ("set-source-mute", "@DEFAULT_SOURCE@")
-        };
-        let _ = Command::new("pactl").args([cmd, t, "toggle"]).status();
-    }
-}
-
-fn open_network_panel() {
-    if Command::new("nm-connection-editor").spawn().is_err() {
-        let _ = Command::new("nm-applet").spawn();
-    }
-}
-
-fn open_bluetooth_panel() {
-    let _ = Command::new("blueman-manager").spawn();
-}
-
-fn open_alerts_panel() {
-    if Command::new("swaync-client")
-        .args(["-t", "-sw"])
-        .spawn()
-        .is_ok()
-    {
-        return;
-    }
-    let _ = Command::new("dunstctl").args(["history-pop"]).spawn();
 }
 
 fn setup_callbacks(bar: &BarWindow, converse_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>) {
@@ -587,22 +523,34 @@ fn setup_callbacks(bar: &BarWindow, converse_slot: std::sync::Arc<Mutex<Option<s
     });
 }
 
-fn setup_timers(bar: &BarWindow, cfg: &BarModuleConfig, converse_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>) -> Timers {
-    let clock = if cfg.show_clock {
+fn setup_timers(
+    bar: &BarWindow,
+    widgets: &WidgetsConfig,
+    converse_slot: std::sync::Arc<Mutex<Option<std::process::Child>>>,
+) -> Timers {
+    let clock = if bar.get_show_clock() {
         let weak = bar.as_weak();
-        let fmt = cfg.clock_format.clone();
-        let interval = if fmt.contains("%S") { Duration::from_secs(1) } else { Duration::from_secs(30) };
+        let fmt = widgets.clock.format.clone();
+        let interval = if fmt.contains("%S") {
+            Duration::from_secs(1)
+        } else {
+            Duration::from_secs(30)
+        };
         let timer = Timer::default();
         timer.start(TimerMode::Repeated, interval, move || {
-            if let Some(bar) = weak.upgrade() { bar.set_clock_text(format_clock(&fmt).into()); }
+            if let Some(bar) = weak.upgrade() {
+                bar.set_clock_text(format_clock(&fmt).into());
+            }
         });
         Some(timer)
-    } else { None };
+    } else {
+        None
+    };
 
-    let volume = if cfg.show_volume_out || cfg.show_volume_in {
+    let volume = if bar.get_show_volume_out() || bar.get_show_volume_in() {
         let weak = bar.as_weak();
-        let out = cfg.show_volume_out;
-        let inp = cfg.show_volume_in;
+        let out = bar.get_show_volume_out();
+        let inp = bar.get_show_volume_in();
         let timer = Timer::default();
         timer.start(TimerMode::Repeated, Duration::from_secs(2), move || {
             if let Some(bar) = weak.upgrade() {
@@ -669,191 +617,4 @@ fn setup_timers(bar: &BarWindow, cfg: &BarModuleConfig, converse_slot: std::sync
     } else { None };
 
     Timers { _clock: clock, _volume: volume, _converse: converse, _stats: stats }
-}
-
-fn format_clock(format: &str) -> String {
-    let out = Command::new("date").arg(format!("+{}", format)).output();
-    match out { Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).trim().to_string(), _ => "--:--".to_string() }
-}
-
-#[derive(Clone, Debug)]
-struct VolumeInfo { text: String, muted: bool }
-
-fn read_volume_wpctl(target: &str) -> Option<VolumeInfo> {
-    let out = Command::new("wpctl").args(["get-volume", target]).output().ok()?;
-    if !out.status.success() { return None; }
-    let s = String::from_utf8_lossy(&out.stdout);
-    let muted = s.contains("[MUTED]");
-    let vol = s.split_whitespace().find_map(|p| p.parse::<f32>().ok()).unwrap_or(0.0);
-    Some(VolumeInfo { text: format!("{}%", (vol * 100.0).round().clamp(0.0, 999.0) as i32), muted })
-}
-
-fn read_volume_pactl(target: &str) -> Option<VolumeInfo> {
-    let (cmd_target, mute_flag) = if target == "@DEFAULT_AUDIO_SINK@" { ("@DEFAULT_SINK@", "get-sink-mute") } else { ("@DEFAULT_SOURCE@", "get-source-mute") };
-    let vol_out = if target == "@DEFAULT_AUDIO_SINK@" {
-        Command::new("pactl").args(["get-sink-volume", cmd_target]).output().ok()
-    } else {
-        Command::new("pactl").args(["get-source-volume", cmd_target]).output().ok()
-    }?;
-    if !vol_out.status.success() { return None; }
-    let vs = String::from_utf8_lossy(&vol_out.stdout);
-    let pct = vs.split('%').next().and_then(|h| h.split_whitespace().last()).and_then(|n| n.parse::<i32>().ok()).unwrap_or(0);
-    let muted = Command::new("pactl").args([mute_flag, cmd_target]).output().ok().map(|o| String::from_utf8_lossy(&o.stdout).contains("yes")).unwrap_or(false);
-    Some(VolumeInfo { text: format!("{pct}%"), muted })
-}
-
-fn read_volume(target: &str) -> VolumeInfo {
-    read_volume_wpctl(target).or_else(|| read_volume_pactl(target)).unwrap_or(VolumeInfo { text: "--%".into(), muted: false })
-}
-
-fn adjust_volume_wpctl(target: &str, up: bool) -> bool {
-    let step = if up { "5%+" } else { "5%-" };
-    Command::new("wpctl")
-        .args(["set-volume", "-l", "1.5", target, step])
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-}
-
-fn adjust_volume_pactl(target: &str, up: bool) -> bool {
-    let (cmd, t) = if target == "@DEFAULT_AUDIO_SINK@" {
-        ("set-sink-volume", "@DEFAULT_SINK@")
-    } else {
-        ("set-source-volume", "@DEFAULT_SOURCE@")
-    };
-    let step = if up { "+5%" } else { "-5%" };
-    Command::new("pactl")
-        .args([cmd, t, step])
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-}
-
-fn adjust_volume(target: &str, up: bool) {
-    if !adjust_volume_wpctl(target, up) {
-        let _ = adjust_volume_pactl(target, up);
-    }
-}
-
-fn read_network() -> String {
-    let out = Command::new("nmcli").args(["-t", "-f", "TYPE,STATE,CONNECTION", "device"]).output();
-    if let Ok(o) = out {
-        if o.status.success() {
-            let s = String::from_utf8_lossy(&o.stdout);
-            for line in s.lines() {
-                let parts: Vec<&str> = line.split(':').collect();
-                if parts.len() >= 3 && parts[1] == "connected" {
-                    let name = parts[2];
-                    if !name.is_empty() && name != "--" {
-                        let short = if name.chars().count() > 12 { name.chars().take(12).collect::<String>() + "…" } else { name.to_string() };
-                        return short;
-                    }
-                }
-            }
-            for line in s.lines() {
-                let parts: Vec<&str> = line.split(':').collect();
-                if parts.len() >= 2 && parts[1] == "connected" { return "on".into(); }
-            }
-        }
-    }
-    let out = Command::new("ip").args(["-o", "link", "show", "up"]).output();
-    if let Ok(o) = out {
-        if o.status.success() {
-            let s = String::from_utf8_lossy(&o.stdout);
-            if s.lines().any(|l| !l.contains("lo:")) { return "on".into(); }
-        }
-    }
-    "off".into()
-}
-
-fn read_bluetooth() -> String {
-    let out = Command::new("bluetoothctl").args(["show"]).output();
-    if let Ok(o) = out {
-        if o.status.success() {
-            let s = String::from_utf8_lossy(&o.stdout);
-            let powered = s.lines().any(|l| l.trim() == "Powered: yes");
-            if !powered { return "off".into(); }
-            if let Ok(dev) = Command::new("bluetoothctl").args(["devices", "Connected"]).output() {
-                let ds = String::from_utf8_lossy(&dev.stdout);
-                let count = ds.lines().filter(|l| !l.trim().is_empty()).count();
-                if count > 0 { return format!("{count}"); }
-            }
-            return "on".into();
-        }
-    }
-    "--".into()
-}
-
-fn read_alerts() -> String {
-    if let Ok(o) = Command::new("swaync-client").args(["-c"]).output() {
-        if o.status.success() {
-            let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-            if !s.is_empty() { return s; }
-        }
-    }
-    if let Ok(o) = Command::new("makoctl").arg("list").output() {
-        if o.status.success() {
-            let s = String::from_utf8_lossy(&o.stdout);
-            let count = s.matches("\n\n").count() + if s.trim().is_empty() { 0 } else { 1 };
-            return count.to_string();
-        }
-    }
-    if let Ok(o) = Command::new("dunstctl").args(["count", "displayed"]).output() {
-        if o.status.success() {
-            let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-            if !s.is_empty() { return s; }
-        }
-    }
-    "0".into()
-}
-
-fn read_cpu() -> String {
-    static PREV: std::sync::OnceLock<std::sync::Mutex<(u64, u64)>> = std::sync::OnceLock::new();
-    let lock = PREV.get_or_init(|| std::sync::Mutex::new((0, 0)));
-    let Ok(content) = std::fs::read_to_string("/proc/stat") else { return "--%".into(); };
-    let Some(line) = content.lines().next() else { return "--%".into(); };
-    let nums: Vec<u64> = line.split_whitespace().skip(1).filter_map(|n| n.parse().ok()).collect();
-    if nums.len() < 4 { return "--%".into(); }
-    let idle = nums.get(3).copied().unwrap_or(0) + nums.get(4).copied().unwrap_or(0);
-    let total: u64 = nums.iter().sum();
-    let mut prev = match lock.lock() { Ok(g) => g, Err(_) => return "--%".into() };
-    let (pt, pi) = *prev;
-    *prev = (total, idle);
-    if pt == 0 || total <= pt { return "--%".into(); }
-    let dt = total - pt;
-    let di = idle.saturating_sub(pi);
-    let usage = ((dt.saturating_sub(di)) as f64 / dt as f64 * 100.0).round().clamp(0.0, 100.0) as i64;
-    format!("{usage}%")
-}
-
-fn read_memory() -> String {
-    let Ok(content) = std::fs::read_to_string("/proc/meminfo") else { return "--%".into(); };
-    let mut total: u64 = 0;
-    let mut avail: u64 = 0;
-    for line in content.lines() {
-        if line.starts_with("MemTotal:") {
-            total = line.split_whitespace().nth(1).and_then(|v| v.parse().ok()).unwrap_or(0);
-        } else if line.starts_with("MemAvailable:") {
-            avail = line.split_whitespace().nth(1).and_then(|v| v.parse().ok()).unwrap_or(0);
-        }
-    }
-    if total == 0 { return "--%".into(); }
-    let used = total.saturating_sub(avail);
-    let pct = (used as f64 / total as f64 * 100.0).round().clamp(0.0, 100.0) as i64;
-    format!("{pct}%")
-}
-
-fn read_disk() -> String {
-    let out = Command::new("df").args(["-h", "/"]).output();
-    if let Ok(o) = out {
-        if o.status.success() {
-            let s = String::from_utf8_lossy(&o.stdout);
-            if let Some(line) = s.lines().nth(1) {
-                if let Some(pct) = line.split_whitespace().nth(4) {
-                    return pct.to_string();
-                }
-            }
-        }
-    }
-    "--%".into()
 }

@@ -13,6 +13,7 @@ members = [
     "crates/beca-ui-catalog",
     "crates/beca-panel",
     "crates/beca-layer-shell",
+    "crates/beca-widgets",
 ]
 
 default-members = ["crates/beca-cli"]

@@ -7,30 +7,26 @@ use crate::config::BarModuleConfig;
 /// section lookup rules.
 #[derive(Debug, Clone, Default)]
 pub struct BarProperties {
-    left: Vec<String>,
+    begin: Vec<String>,
     center: Vec<String>,
-    right: Vec<String>,
+    end: Vec<String>,
 }
 
 impl BarProperties {
     pub fn from_config(config: &BarModuleConfig) -> Self {
-        let (left, center, right) = config.resolved_layout();
-        Self {
-            left,
-            center,
-            right,
-        }
+        let (begin, center, end) = config.resolved_layout();
+        Self { begin, center, end }
     }
 
     /// Returns the section containing `widget`, if any.
     ///
-    /// The lookup order (left, right, center) matches the historical behavior
+    /// The lookup order (begin, end, center) matches the historical behavior
     /// of both renderers when a widget appears in more than one section.
     pub fn section(&self, widget: &str) -> Option<&'static str> {
-        if self.left.iter().any(|name| name == widget) {
-            Some("left")
-        } else if self.right.iter().any(|name| name == widget) {
-            Some("right")
+        if self.begin.iter().any(|name| name == widget) {
+            Some("begin")
+        } else if self.end.iter().any(|name| name == widget) {
+            Some("end")
         } else if self.center.iter().any(|name| name == widget) {
             Some("center")
         } else {
@@ -49,22 +45,22 @@ mod tests {
 
     fn properties() -> BarProperties {
         BarProperties {
-            left: vec!["clock".into(), "launcher".into()],
+            begin: vec!["clock".into(), "launcher".into()],
             center: vec!["volume-out".into()],
-            right: vec!["clock".into(), "network".into()],
+            end: vec!["clock".into(), "network".into()],
         }
     }
 
     #[test]
-    fn section_prefers_left_over_right() {
-        assert_eq!(properties().section("clock"), Some("left"));
+    fn section_prefers_begin_over_end() {
+        assert_eq!(properties().section("clock"), Some("begin"));
     }
 
     #[test]
-    fn section_finds_center_and_right_widgets() {
+    fn section_finds_center_and_end_widgets() {
         let props = properties();
         assert_eq!(props.section("volume-out"), Some("center"));
-        assert_eq!(props.section("network"), Some("right"));
+        assert_eq!(props.section("network"), Some("end"));
     }
 
     #[test]

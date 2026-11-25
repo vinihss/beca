@@ -1,0 +1,6 @@
+[package]
+name = "beca-widgets"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]

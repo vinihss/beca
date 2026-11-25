@@ -25,6 +25,7 @@ pub fn module_info(name: &str) -> Option<String> {
         "bar" => Some(
             "module: bar\n\
              description: Status bar (top/bottom) with configurable sections and widgets\n\
+             config: [bar.top]/[bar.bottom] with begin/center/end sessions; widget settings in [widget.*]\n\
              actions:\n\
                show [top|bottom]   Show bar (default: top)\n\
                show-top            Show top bar\n\

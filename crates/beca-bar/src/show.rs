@@ -1,12 +1,16 @@
 use super::*;
-use crate::converse::converse_spawn_or_signal;
 use crate::hyprland::{clear_reserved_for_position, dock_bar_hyprland, set_monitor_reserved};
 use beca_core::BarProperties;
-use crate::widgets::*;
+use beca_widgets::{
+    adjust_volume, converse_spawn_or_signal, format_clock, open_alerts_panel,
+    open_bluetooth_panel, open_network_panel, read_alerts, read_bluetooth, read_cpu, read_disk,
+    read_memory, read_network, read_volume, toggle_volume_mute,
+};
 
 pub fn show(position: &str) -> Result<()> {
     let resolved = beca_core::config::load();
-    let bar_cfg = resolved.config.modules.bar_config_for(position);
+    let bar_cfg = resolved.config.bar_config_for(position);
+    let widgets = &resolved.config.widget;
     let theme = &resolved.theme;
     if !bar_cfg.enabled {
         return Ok(());
@@ -20,7 +24,7 @@ pub fn show(position: &str) -> Result<()> {
                 "bottom" => beca_layer_shell::BarPosition::Bottom,
                 _ => beca_layer_shell::BarPosition::Top,
             };
-            match beca_layer_shell::run_bar(pos, &bar_cfg, theme) {
+            match beca_layer_shell::run_bar(pos, &bar_cfg, widgets, theme) {
                 Ok(()) => return Ok(()),
                 Err(e) => {
                     eprintln!("[beca-bar] layer-shell unavailable, falling back to window mode: {e}");
@@ -92,30 +96,32 @@ pub fn show(position: &str) -> Result<()> {
 
     let _ = app.set_property(
         "launcher-label",
-        Value::String(bar_cfg.launcher_label.clone().into()),
+        Value::String(widgets.launcher.label.clone().into()),
     );
     let _ = app.set_property(
-        "left-align",
-        Value::String(bar_cfg.left_align.clone().into()),
+        "begin-align",
+        Value::String(bar_cfg.begin_align.clone().into()),
     );
     let _ = app.set_property(
         "center-align",
         Value::String(bar_cfg.center_align.clone().into()),
     );
-    let _ = app.set_property(
-        "right-align",
-        Value::String(bar_cfg.right_align.clone().into()),
-    );
+    let _ = app.set_property("end-align", Value::String(bar_cfg.end_align.clone().into()));
     let _ = app.set_property(
         "background-opacity",
         Value::Number(bar_cfg.background_opacity as f64),
     );
     let _ = app.set_property("show-border", Value::Bool(bar_cfg.show_border));
-    if let Some(color) = bar_cfg.background.as_ref().and_then(|s| beca_ui::theme::parse_color(s)) {
+    if let Some(color) = bar_cfg
+        .background
+        .as_ref()
+        .and_then(|s| beca_ui::theme::parse_color(s))
+    {
         let _ = app.set_property("bar-background", Value::Brush(color.into()));
     }
 
-    let initial = format_clock(&bar_cfg.clock_format);
+    let clock_format = widgets.clock.format.clone();
+    let initial = format_clock(&clock_format);
     let _ = app.set_property("clock-text", Value::String(initial.into()));
     if show_volume_out {
         let v = read_volume("@DEFAULT_AUDIO_SINK@");
@@ -294,8 +300,8 @@ pub fn show(position: &str) -> Result<()> {
     }
 
     let weak_clock = app.as_weak();
-    let fmt = bar_cfg.clock_format.clone();
-    let show_clock = bar_cfg.show_clock;
+    let fmt = clock_format;
+    let show_clock = props.visible("clock");
     if show_clock {
         let running_flag = running.clone();
         thread::spawn(move || {
@@ -318,8 +324,6 @@ pub fn show(position: &str) -> Result<()> {
         });
     }
 
-    let show_volume_out = bar_cfg.show_volume_out;
-    let show_volume_in = bar_cfg.show_volume_in;
     if show_volume_out || show_volume_in {
         let running_flag = running.clone();
         let weak_vol = app.as_weak();

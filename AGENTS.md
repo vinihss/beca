@@ -13,6 +13,7 @@ Beca is a Wayland/Hyprland shell written in Rust + Slint with Lua scripts. Runti
 - `crates/beca-ui` — Slint kit + voice engine.
 - `crates/beca-layer-shell` — Wayland layer-shell surfaces.
 - `crates/beca-ui-catalog`, `crates/beca-panel` — catalog/panel experiments; not the shell entry point.
+- `crates/beca-widgets` — shared bar widget data providers and actions (no renderer dependency).
 
 ## Hard contracts
 
@@ -24,7 +25,7 @@ Beca is a Wayland/Hyprland shell written in Rust + Slint with Lua scripts. Runti
 
 ## Verify
 
-- `cargo check` (root) covers only `beca-cli` — `default-members = ["crates/beca-cli"]`. Use `cargo check --workspace` for all 12 crates.
+- `cargo check` (root) covers only `beca-cli` — `default-members = ["crates/beca-cli"]`. Use `cargo check --workspace` for all 13 crates.
 - `cargo test -p beca-core -p beca-daemon`
 - `cargo test --workspace --lib`
 - `cargo build --release -p beca-cli` → install to `~/.local/bin/beca`

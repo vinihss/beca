@@ -10,3 +10,4 @@ slint-interpreter.workspace = true
 beca-core = { path = "../beca-core" }
 beca-ui = { path = "../beca-ui" }
 beca-layer-shell = { path = "../beca-layer-shell" }
+beca-widgets = { path = "../beca-widgets" }

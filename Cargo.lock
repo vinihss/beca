@@ -385,6 +385,7 @@ dependencies = [
  "beca-core",
  "beca-layer-shell",
  "beca-ui",
+ "beca-widgets",
  "serde_json",
  "slint-interpreter",
 ]
@@ -412,6 +413,7 @@ dependencies = [
  "anyhow",
  "beca-apps",
  "beca-ui",
+ "beca-widgets",
  "dirs",
  "mlua",
  "serde",
@@ -454,6 +456,7 @@ version = "0.1.0"
 dependencies = [
  "beca-core",
  "beca-ui",
+ "beca-widgets",
  "calloop 0.13.0",
  "serde_json",
  "slint",
@@ -517,6 +520,10 @@ dependencies = [
  "slint",
  "slint-interpreter",
 ]
+
+[[package]]
+name = "beca-widgets"
+version = "0.1.0"
 
 [[package]]
 name = "bincode"

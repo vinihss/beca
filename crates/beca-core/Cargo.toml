@@ -14,4 +14,5 @@ slint-interpreter.workspace = true
 anyhow.workspace = true
 beca-apps = { path = "../beca-apps" }
 beca-ui = { path = "../beca-ui" }
+beca-widgets = { path = "../beca-widgets" }
 

@@ -34,6 +34,7 @@ Precedence: **CLI > ENV > `$XDG_CONFIG_HOME/beca/config.toml` > defaults**.
 - Base: `$XDG_CONFIG_HOME/beca/` (default `~/.config/beca/`) — `config.toml`, `themes/<name>.toml`, `scripts/`.
 - Theme without recompiling: tokens injected into the global `Theme` at init (`Theme` `in-out`, applied by `beca`/voice engine via `beca-core`).
 - Lua scripts on disk with XDG priority, embedded fallback. Schemas: `docs/schema/config.example.toml`, `docs/schema/theme.default.example.toml`.
+- Bars are configured per position: `[bar.top]` / `[bar.bottom]` with `enabled` and `begin`/`center`/`end` widget lists; widget settings live in `[widget.clock]` / `[widget.launcher]`. The two positions are independent (no `[modules.bar*]`).
 
 ## 4. Current state (post-merge)
 ```text
@@ -48,6 +49,7 @@ crates/
   beca-apps/            .desktop: desktop_entry, indexer (search/launch)
   beca-ui/              Slint kit (ui/): Theme, SearchWindow, VoiceCaptureWindow + voice engine
   beca-layer-shell/     wlr-layer-shell surfaces (bar, launcher, quick HUD, voice window)
+  beca-widgets/         shared bar widget providers and actions (renderer-independent)
 docs/                   architecture.md, agents.md, hyprland_ipc.md, ui-design-system.md, schema/
 examples/               example Lua scripts
 scripts/                reference scripts (launcher.lua)

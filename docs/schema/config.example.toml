@@ -39,32 +39,46 @@ status_speaking = "Speaking..."
 # [modules.launcher]
 # enabled = true
 
-[modules.bar]
+# Bars are configured per position. Supported positions: top | bottom.
+# Widget lists use three sessions: begin | center | end.
+# Supported widgets: launcher, clock, conversation, volume-out, volume-in,
+# network, alerts, bluetooth, cpu, memory, disk.
+# Omitting all three lists keeps the position defaults; providing at least one
+# list makes the omitted ones empty.
+
+[bar.top]
 enabled = true
-# Clock format (strftime), e.g.: "%H:%M" or "%H:%M:%S"
-clock_format = "%H:%M"
-show_clock = true
-show_launcher = true
-launcher_label = "Apps"
 height = 34.0
+background_opacity = 1.0
 # Reserve space (exclusive zone/struts) so tiled windows don't overlap the bar
 exclusive = true
-# Layout: 3 sections (left/center/right) with per-section alignment and widget placement
-clock_section = "center"      # left | center | right
-launcher_section = "left"     # left | center | right
-left_align = "start"          # start | center | end
-center_align = "center"       # start | center | end
-right_align = "end"          # start | center | end
-# Bar background opacity (0.0 = transparent, 1.0 = opaque)
-background_opacity = 1.0
-# Show the bar border/outline
 show_border = false
-# Volume widgets (PipeWire/wpctl or PulseAudio/pactl)
-show_volume_out = true        # output (sink)
-show_volume_in = true         # input (source/microphone)
-volume_out_section = "right"  # left | center | right
-volume_in_section = "right"   # left | center | right
-# Voice widget (opens the capture/transcription window)
-show_voice = true
-voice_label = "Voice"
-voice_section = "left"        # left | center | right
+# background = "#2D2D2D"
+begin_align = "start"     # start | center | end
+center_align = "center"   # start | center | end
+end_align = "end"         # start | center | end
+begin = ["cpu", "memory", "disk"]
+center = ["clock", "conversation", "alerts"]
+end = ["bluetooth"]
+
+[bar.bottom]
+enabled = true
+height = 34.0
+background_opacity = 1.0
+exclusive = true
+show_border = false
+# background = "#2D2D2D"
+begin_align = "start"     # start | center | end
+center_align = "center"   # start | center | end
+end_align = "end"         # start | center | end
+begin = ["launcher"]
+center = []
+end = ["volume-out", "volume-in", "network"]
+
+# Widget-specific settings are global (shared by all bars).
+
+[widget.clock]
+format = "%H:%M"
+
+[widget.launcher]
+label = "Apps"

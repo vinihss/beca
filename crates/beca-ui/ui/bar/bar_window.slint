@@ -33,20 +33,20 @@ export component BarWindow inherits Window {
     in-out property <string> disk-text: "--%";
 
     in-out property <string> clock-section: "center";
-    in-out property <string> launcher-section: "left";
-    in-out property <string> volume-out-section: "right";
-    in-out property <string> volume-in-section: "right";
+    in-out property <string> launcher-section: "begin";
+    in-out property <string> volume-out-section: "end";
+    in-out property <string> volume-in-section: "end";
     in-out property <string> conversation-section: "center";
-    in-out property <string> network-section: "right";
+    in-out property <string> network-section: "end";
     in-out property <string> alerts-section: "center";
-    in-out property <string> bluetooth-section: "right";
-    in-out property <string> cpu-section: "left";
-    in-out property <string> memory-section: "left";
-    in-out property <string> disk-section: "left";
+    in-out property <string> bluetooth-section: "end";
+    in-out property <string> cpu-section: "begin";
+    in-out property <string> memory-section: "begin";
+    in-out property <string> disk-section: "begin";
 
-    in-out property <string> left-align: "start";
+    in-out property <string> begin-align: "start";
     in-out property <string> center-align: "center";
-    in-out property <string> right-align: "end";
+    in-out property <string> end-align: "end";
     in-out property <float> background-opacity: 1.0;
     in-out property <bool> show-border: false;
     in-out property <brush> bar-background: Theme.card-bg;
@@ -60,13 +60,13 @@ export component BarWindow inherits Window {
     callback network-clicked();
     callback bluetooth-clicked();
 
-    property <[string]> section-names: ["left", "center", "right"];
-    property <LayoutAlignment> left-align-value:
-        root.left-align == "start" ? start : (root.left-align == "end" ? end : center);
+    property <[string]> section-names: ["begin", "center", "end"];
+    property <LayoutAlignment> begin-align-value:
+        root.begin-align == "start" ? start : (root.begin-align == "end" ? end : center);
     property <LayoutAlignment> center-align-value:
         root.center-align == "start" ? start : (root.center-align == "end" ? end : center);
-    property <LayoutAlignment> right-align-value:
-        root.right-align == "start" ? start : (root.right-align == "end" ? end : center);
+    property <LayoutAlignment> end-align-value:
+        root.end-align == "start" ? start : (root.end-align == "end" ? end : center);
 
     title: "beca-bar";
     no-frame: true;
@@ -96,8 +96,8 @@ export component BarWindow inherits Window {
                     width: 100%;
                     height: 100%;
                     spacing: 4px;
-                    alignment: i == 0 ? root.left-align-value
-                        : (i == 1 ? root.center-align-value : root.right-align-value);
+                    alignment: i == 0 ? root.begin-align-value
+                        : (i == 1 ? root.center-align-value : root.end-align-value);
 
                     if root.show-launcher && root.launcher-section == section : LauncherWidget {
                         label: root.launcher-label;

@@ -78,7 +78,7 @@ cargo check -p beca-cli
 cargo check -p beca-core
 cargo check -p beca-ui
 
-# validação dos 12 crates
+# validação dos 13 crates
 cargo check --workspace
 cargo test --workspace --lib
 
