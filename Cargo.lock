@@ -490,6 +490,7 @@ dependencies = [
  "cpal",
  "earshot",
  "hound",
+ "i-slint-backend-testing",
  "mlua",
  "serde",
  "serde_json",

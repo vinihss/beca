@@ -1,6 +1,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::time::Duration;
 
 use slint::platform::software_renderer::{MinimalSoftwareWindow, PremultipliedRgbaColor};
@@ -37,6 +38,15 @@ use xkeysym::Keysym;
 const WIDTH: u32 = 560;
 const HEIGHT: u32 = 420;
 
+/// Ações do teclado entregues ao launcher fora da janela Slint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LauncherAction {
+    Navigate(i32),
+    Activate,
+    CycleSession,
+    VoiceRequested,
+}
+
 struct LauncherInstance {
     layer: LayerSurface,
     pool: SlotPool,
@@ -59,8 +69,11 @@ struct LauncherState {
     pointer: Option<wl_pointer::WlPointer>,
     keyboard: Option<wl_keyboard::WlKeyboard>,
     keyboard_focused: bool,
+    ctrl_held: bool,
+    voice_key_held: bool,
+    tab_key_held: bool,
     exit: bool,
-    nav_tx: Option<std::sync::mpsc::Sender<i32>>,
+    nav_tx: Option<mpsc::Sender<LauncherAction>>,
 }
 
 impl LauncherState {
@@ -95,12 +108,18 @@ impl LauncherState {
             configured: false,
         });
         self.keyboard_focused = false;
+        self.ctrl_held = false;
+        self.voice_key_held = false;
+        self.tab_key_held = false;
         Ok(())
     }
 
     fn hide_surface(&mut self) {
         self.instance = None;
         self.keyboard_focused = false;
+        self.ctrl_held = false;
+        self.voice_key_held = false;
+        self.tab_key_held = false;
     }
 
     fn maybe_sync_visibility(&mut self) -> Result<(), String> {
@@ -185,7 +204,7 @@ pub fn run_launcher(
 pub fn run_launcher_with_nav(
     window: Rc<MinimalSoftwareWindow>,
     quit: Arc<AtomicBool>,
-    nav_tx: Option<std::sync::mpsc::Sender<i32>>,
+    nav_tx: Option<mpsc::Sender<LauncherAction>>,
 ) -> Result<(), String> {
     let conn = Connection::connect_to_env().map_err(|e| format!("wayland connect: {e}"))?;
     let (globals, mut event_queue) =
@@ -211,12 +230,18 @@ pub fn run_launcher_with_nav(
         pointer: None,
         keyboard: None,
         keyboard_focused: false,
+        ctrl_held: false,
+        voice_key_held: false,
+        tab_key_held: false,
         exit: false,
         nav_tx,
     };
 
     loop {
         slint::platform::update_timers_and_animations();
+        // Necessário para que slint::invoke_from_event_loop() funcione aqui:
+        // resultados de transcrição e detecção de silêncio usam esse caminho.
+        crate::platform::drain_pending_closures();
         if quit.load(Ordering::Relaxed) || state.exit {
             break;
         }
@@ -445,6 +470,9 @@ impl KeyboardHandler for LauncherState {
     ) {
         if self.instance_for_surface(surface) {
             self.keyboard_focused = false;
+            self.ctrl_held = false;
+            self.voice_key_held = false;
+            self.tab_key_held = false;
             self.window
                 .dispatch_event(WindowEvent::WindowActiveChanged(false));
         }
@@ -461,6 +489,26 @@ impl KeyboardHandler for LauncherState {
         if !self.keyboard_focused {
             return;
         }
+        // TAB troca os modos antes do Slint: o LineEdit moveria o foco
+        // ou receberia o caractere de tabulação.
+        if is_tab_key(event.keysym) {
+            self.tab_key_held = true;
+            if let Some(tx) = &self.nav_tx {
+                let _ = tx.send(LauncherAction::CycleSession);
+            }
+            self.window.request_redraw();
+            return;
+        }
+        // Ctrl+Space precisa ser capturado antes do Slint: o backend manda só
+        // `text`, sem modifiers, e o LineEdit consumiria o espaço.
+        if is_ctrl_space(self.ctrl_held, event.keysym) {
+            self.voice_key_held = true;
+            if let Some(tx) = &self.nav_tx {
+                let _ = tx.send(LauncherAction::VoiceRequested);
+            }
+            self.window.request_redraw();
+            return;
+        }
         if let Some(text) = keysym_to_slint_text(&event) {
             let esc: SharedString = Key::Escape.into();
             let up: SharedString = Key::UpArrow.into();
@@ -473,17 +521,17 @@ impl KeyboardHandler for LauncherState {
             }
             if let Some(tx) = &self.nav_tx {
                 if text == up {
-                    let _ = tx.send(-1);
+                    let _ = tx.send(LauncherAction::Navigate(-1));
                     self.window.request_redraw();
                     return;
                 }
                 if text == down {
-                    let _ = tx.send(1);
+                    let _ = tx.send(LauncherAction::Navigate(1));
                     self.window.request_redraw();
                     return;
                 }
                 if text == ret {
-                    let _ = tx.send(0);
+                    let _ = tx.send(LauncherAction::Activate);
                     self.window.request_redraw();
                     return;
                 }
@@ -502,6 +550,16 @@ impl KeyboardHandler for LauncherState {
         event: KeyEvent,
     ) {
         if !self.keyboard_focused {
+            return;
+        }
+        if self.tab_key_held && is_tab_key(event.keysym) {
+            self.tab_key_held = false;
+            self.window.request_redraw();
+            return;
+        }
+        if self.voice_key_held && is_space_key(event.keysym) {
+            self.voice_key_held = false;
+            self.window.request_redraw();
             return;
         }
         if let Some(text) = keysym_to_slint_text(&event) {
@@ -525,8 +583,9 @@ impl KeyboardHandler for LauncherState {
         _: &QueueHandle<Self>,
         _: &wl_keyboard::WlKeyboard,
         _serial: u32,
-        _modifiers: Modifiers,
+        modifiers: Modifiers,
     ) {
+        self.ctrl_held = modifiers.ctrl;
     }
 
     fn update_repeat_info(
@@ -570,6 +629,18 @@ fn map_button(button: u32) -> Option<PointerEventButton> {
     }
 }
 
+fn is_space_key(keysym: Keysym) -> bool {
+    matches!(keysym, Keysym::space | Keysym::KP_Space)
+}
+
+fn is_tab_key(keysym: Keysym) -> bool {
+    matches!(keysym, Keysym::Tab | Keysym::ISO_Left_Tab)
+}
+
+fn is_ctrl_space(ctrl_held: bool, keysym: Keysym) -> bool {
+    ctrl_held && is_space_key(keysym)
+}
+
 fn keysym_to_slint_text(event: &KeyEvent) -> Option<SharedString> {
     let special: Option<SharedString> = match event.keysym {
         Keysym::Escape => Some(Key::Escape.into()),
@@ -600,4 +671,31 @@ fn keysym_to_slint_text(event: &KeyEvent) -> Option<SharedString> {
         .keysym
         .key_char()
         .map(|c| SharedString::from(c.to_string().as_str()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_ctrl_space, is_space_key, is_tab_key};
+    use xkeysym::Keysym;
+
+    #[test]
+    fn ctrl_space_matches_both_space_keys() {
+        assert!(is_ctrl_space(true, Keysym::space));
+        assert!(is_ctrl_space(true, Keysym::KP_Space));
+    }
+
+    #[test]
+    fn plain_space_and_ctrl_other_keys_do_not_match() {
+        assert!(!is_ctrl_space(false, Keysym::space));
+        assert!(!is_ctrl_space(true, Keysym::a));
+        assert!(is_space_key(Keysym::space));
+        assert!(!is_space_key(Keysym::Return));
+    }
+
+    #[test]
+    fn tab_matches_both_tab_keys() {
+        assert!(is_tab_key(Keysym::Tab));
+        assert!(is_tab_key(Keysym::ISO_Left_Tab));
+        assert!(!is_tab_key(Keysym::Return));
+    }
 }

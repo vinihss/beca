@@ -295,6 +295,31 @@ pub fn invoke_on_event_loop(f: impl FnOnce() + Send + 'static) -> Result<(), Str
 
 #[cfg(test)]
 mod tests {
+    use slint::{
+        ComponentHandle, LogicalPosition, ModelRc, SharedString, VecModel,
+        platform::{PointerEventButton, WindowEvent},
+    };
+    use std::{
+        cell::{Cell, RefCell},
+        rc::Rc,
+    };
+
+    fn click(window: &crate::SearchWindow, x: f32, y: f32) {
+        let pos = LogicalPosition::new(x, y);
+        window
+            .window()
+            .dispatch_event(WindowEvent::PointerMoved { position: pos });
+        window.window().dispatch_event(WindowEvent::PointerPressed {
+            position: pos,
+            button: PointerEventButton::Left,
+        });
+        window
+            .window()
+            .dispatch_event(WindowEvent::PointerReleased {
+                position: pos,
+                button: PointerEventButton::Left,
+            });
+    }
 
     #[test]
     fn runtime_windows_compile() {
@@ -336,6 +361,88 @@ mod tests {
             available.iter().any(|c| c == cb),
             "ConversationOrb is missing callback `{cb}` (known: {available:?})"
         );
+    }
+
+    #[test]
+    fn search_window_declares_voice_and_session_api() {
+        let def = super::compile_component("SearchWindow")
+            .unwrap_or_else(|e| panic!("SearchWindow failed to compile: {e}"));
+        let callbacks: Vec<String> = def.callbacks().collect();
+        let properties: Vec<String> = def.properties().map(|(n, _)| n).collect();
+        for cb in [
+            "voice_requested",
+            "session_requested",
+            "web_requested",
+            "web_history_selected",
+        ] {
+            assert!(
+                callbacks.iter().any(|c| c == cb),
+                "SearchWindow is missing callback `{cb}` (known: {callbacks:?})"
+            );
+        }
+        for prop in ["voice-active", "voice-busy", "session", "web-history"] {
+            assert!(
+                properties.iter().any(|n| n == prop),
+                "SearchWindow is missing property `{prop}` (known: {properties:?})"
+            );
+        }
+    }
+
+    #[test]
+    fn search_window_mic_click_invokes_callback() {
+        let _ = slint::platform::set_platform(Box::new(
+            i_slint_backend_testing::TestingBackend::new(Default::default()),
+        ));
+        let window = crate::SearchWindow::new().expect("SearchWindow failed to create");
+        let hits = Rc::new(Cell::new(0));
+        let callback_hits = hits.clone();
+        window.on_voice_requested(move || callback_hits.set(callback_hits.get() + 1));
+        window.show().expect("SearchWindow failed to show");
+
+        click(&window, 532.0, 28.0);
+
+        assert_eq!(
+            hits.get(),
+            1,
+            "clicking the mic button must invoke voice_requested"
+        );
+    }
+
+    #[test]
+    fn clicking_web_tab_selects_web_session() {
+        let _ = slint::platform::set_platform(Box::new(
+            i_slint_backend_testing::TestingBackend::new(Default::default()),
+        ));
+        let window = crate::SearchWindow::new().expect("SearchWindow failed to create");
+        let hits = Rc::new(Cell::new(-1));
+        let callback_hits = hits.clone();
+        window.on_session_requested(move |session| callback_hits.set(session));
+        window.show().expect("SearchWindow failed to show");
+
+        click(&window, 208.0, 90.0);
+
+        assert_eq!(hits.get(), 1, "Web tab must request session 1");
+        assert_eq!(window.get_session(), 1);
+    }
+
+    #[test]
+    fn clicking_web_history_invokes_callback() {
+        let _ = slint::platform::set_platform(Box::new(
+            i_slint_backend_testing::TestingBackend::new(Default::default()),
+        ));
+        let window = crate::SearchWindow::new().expect("SearchWindow failed to create");
+        window.set_session(1);
+        window.set_web_history(ModelRc::new(VecModel::from(vec![SharedString::from(
+            "rust slint",
+        )])));
+        let hits = Rc::new(RefCell::new(String::new()));
+        let callback_hits = hits.clone();
+        window.on_web_history_selected(move |term| *callback_hits.borrow_mut() = term.to_string());
+        window.show().expect("SearchWindow failed to show");
+
+        click(&window, 120.0, 116.0);
+
+        assert_eq!(hits.borrow().as_str(), "rust slint");
     }
 
     #[test]

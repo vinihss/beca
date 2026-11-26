@@ -3,12 +3,66 @@ use std::fs;
 use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+/// Volume dos feedbacks sonoros do microfone: baixo o suficiente para não
+/// incomodar, mas audível sobre o áudio do sistema.
+const SOUND_VOLUME: u32 = 18_000;
+const SOUND_VOLUME_DB: &str = "-11.0";
 
 pub fn notify(msg: &str) {
     let _ = Command::new("notify-send")
         .args(["beca voice", msg])
         .status();
+}
+
+fn play_sound(paths: &[&str], fallback_id: &str) {
+    let volume = SOUND_VOLUME.to_string();
+    for path in paths {
+        if !Path::new(path).exists() {
+            continue;
+        }
+        let _ = Command::new("paplay")
+            .arg("--volume")
+            .arg(&volume)
+            .arg(path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn();
+        return;
+    }
+
+    let _ = Command::new("canberra-gtk-play")
+        .args(["-i", fallback_id, "-V", SOUND_VOLUME_DB])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
+}
+
+/// Som curto de confirmação ao iniciar a captura de microfone.
+pub fn play_start_sound() {
+    play_sound(
+        &[
+            "/usr/share/sounds/freedesktop/stereo/audio-volume-change.oga",
+            "/usr/share/sounds/freedesktop/stereo/bell.oga",
+            "/usr/share/sounds/freedesktop/stereo/message-new-instant.oga",
+        ],
+        "audio-volume-change",
+    );
+}
+
+/// Som curto ao detectar o fim da fala e iniciar a transcrição.
+pub fn play_stop_sound() {
+    play_sound(
+        &[
+            "/usr/share/sounds/freedesktop/stereo/complete.oga",
+            "/usr/share/sounds/freedesktop/stereo/message.oga",
+            "/usr/share/sounds/freedesktop/stereo/dialog-information.oga",
+        ],
+        "complete",
+    );
 }
 
 pub fn copy_to_clipboard(text: &str) -> bool {
@@ -55,6 +109,7 @@ pub fn transcribe(base_url: &str, audio_path: &Path) -> Result<String, String> {
     let url = format!("{}/transcribe", base_url.trim_end_matches('/'));
     eprintln!("[voice] transcribing...");
     let resp = ureq::post(&url)
+        .timeout(Duration::from_secs(60))
         .set("Content-Type", "audio/wav")
         .send(Cursor::new(bytes))
         .map_err(|e| format!("transcribe request failed: {e}"))?;

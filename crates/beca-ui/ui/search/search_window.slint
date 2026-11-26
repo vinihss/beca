@@ -16,11 +16,32 @@ export component SearchWindow inherits Window {
     in-out property <string> placeholder: "Search...";
     in-out property <string> query: "";
     in-out property <[AppEntry]> results: [];
+    in-out property <[string]> web-history: [];
     in-out property <int> selected-index: 0;
+    in-out property <int> session: 0; // 0=Apps, 1=Web, 2=Files, 3=Folders
+    in-out property <bool> voice-active: false;
+    in-out property <bool> voice-busy: false;
+
+    property <[image]> session-icons: [
+        @image-url("icons/apps.svg"),
+        @image-url("icons/web.svg"),
+        @image-url("icons/files.svg"),
+        @image-url("icons/folders.svg"),
+    ];
+
+    // Onda triangular contínua enquanto grava, sem Timer nem estado extra.
+    property <float> mic-pulse: root.voice-active
+        ? clamp(1 - mod(animation-tick() / 700ms, 1) * 2, 0, 1)
+            + clamp(mod(animation-tick() / 700ms, 1) * 2 - 1, 0, 1)
+        : 0;
 
     callback search_requested(string);
     callback result_selected(string);
     callback activate_selected();
+    callback voice_requested();
+    callback session_requested(int);
+    callback web_requested(string);
+    callback web_history_selected(string);
 
     forward-focus: search-input;
 
@@ -63,18 +84,153 @@ export component SearchWindow inherits Window {
                 spacing: 8px;
                 search-input := LineEdit {
                     horizontal-stretch: 1;
-                    placeholder-text: root.placeholder;
+                    placeholder-text: root.session == 1 ? "Search the web..."
+                        : root.session == 2 ? "Search files..."
+                        : root.session == 3 ? "Search folders..."
+                        : root.placeholder;
                     text <=> root.query;
                     edited(text) => {
                         root.selected-index = 0;
                         root.search_requested(text);
                     }
-                    accepted(text) => { root.activate_current(); }
+                    accepted(text) => {
+                        if (root.session == 0) { root.activate_current(); }
+                        else if (root.session == 1) { root.web_requested(text); }
+                    }
+                }
+
+                Rectangle {
+                    width: 36px;
+                    height: 36px;
+                    horizontal-stretch: 0;
+                    border-radius: 18px;
+                    border-width: 1px;
+                    border-color: Theme.card-border;
+                    background: root.voice-active
+                        ? Theme.recording.with-alpha(0.72 + 0.28 * root.mic-pulse)
+                        : (root.voice-busy ? Theme.m3-secondary-container : Theme.surface-alt);
+
+                    // Mesmo glifo usado no widget de voz da barra.
+                    Text {
+                        width: 100%;
+                        height: 100%;
+                        text: "󰍬";
+                        font-family: Theme.icon-font-family;
+                        font-size: root.voice-active ? (17px + 4px * root.mic-pulse) : 19px;
+                        opacity: root.voice-active ? (0.6 + 0.4 * root.mic-pulse) : 1.0;
+                        color: root.voice-active || root.voice-busy
+                            ? Theme.m3-background : Theme.text-main;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    if root.voice-active || root.voice-busy : Rectangle {
+                        x: parent.width - 9px;
+                        y: 3px;
+                        width: 6px;
+                        height: 6px;
+                        border-radius: 3px;
+                        background: root.voice-busy ? Theme.accent : Theme.m3-background;
+                    }
+
+                    TouchArea {
+                        width: 100%;
+                        height: 100%;
+                        mouse-cursor: pointer;
+                        clicked => { root.voice_requested(); }
+                    }
                 }
             }
         }
 
-        if root.results.length > 0 || root.query != "" : Rectangle {
+        Rectangle {
+            height: 36px;
+            background: Theme.card-bg.with-alpha(0.85);
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: Theme.card-border;
+
+            HorizontalLayout {
+                padding: 3px;
+                spacing: 2px;
+
+                for icon[idx] in root.session-icons : Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: 9px;
+                    background: idx == root.session
+                        ? Theme.accent.with-alpha(0.22)
+                        : (session-touch.has-hover ? Theme.surface-alt : transparent);
+
+                    Image {
+                        width: 18px;
+                        height: 18px;
+                        source: icon;
+                        colorize: idx == root.session ? Theme.text-strong : Theme.text-main;
+                        opacity: idx == root.session ? 1 : 0.7;
+                        image-fit: contain;
+                    }
+
+                    session-touch := TouchArea {
+                        width: 100%;
+                        height: 100%;
+                        mouse-cursor: pointer;
+                        clicked => {
+                            root.session = idx;
+                            root.session_requested(idx);
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.session == 1 && root.web-history.length > 0 : Rectangle {
+            vertical-stretch: 1;
+            background: Theme.card-bg.with-alpha(0.85);
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: Theme.card-border;
+
+            ScrollView {
+                width: 100%;
+                height: 100%;
+                content-height: root.web-history.length * 40px;
+
+                for term[idx] in root.web-history : Rectangle {
+                    y: idx * 40px;
+                    height: 40px;
+                    width: parent.width;
+
+                    Rectangle {
+                        x: 6px;
+                        y: 3px;
+                        width: parent.width - 12px;
+                        height: 34px;
+                        border-radius: 8px;
+                        background: history-touch.has-hover ? Theme.surface-alt : transparent;
+
+                        Text {
+                            x: 12px;
+                            width: parent.width - 24px;
+                            height: 100%;
+                            text: term;
+                            color: Theme.text-main;
+                            font-size: 14px;
+                            overflow: elide;
+                            vertical-alignment: center;
+                        }
+
+                        history-touch := TouchArea {
+                            width: 100%;
+                            height: 100%;
+                            mouse-cursor: pointer;
+                            clicked => { root.web_history_selected(term); }
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.session == 0 && (root.results.length > 0 || root.query != "") : Rectangle {
             vertical-stretch: 1;
             background: Theme.card-bg.with-alpha(0.85);
             border-radius: 12px;
